@@ -1,34 +1,29 @@
 package GoWebFrame
 
-
-
-/* node 节点 */
-type node struct {
-	// 节点数
-	path string
-	// 子path到字节点的映射
-	children map[string]*node
-	// 实际逻辑
-	handler HandleFunc
-
-}
-
-// Router 路由 */
-type Router struct {
+// router
+// @Description: 路由
+// @author liujiming
+// @date 2023-01-31 15:58:32
+type router struct {
 	trees map[string]*node
 }
 
+// node
+// @Description: 节点
+// @author liujiming
+// @date 2023-01-31 15:57:04
+type node struct {
+	path     string           //路径
+	children map[string]*node // 子节点
+	handler  HandleFunc
+}
 
-func NewRouter() *Router {
-	return &Router{
+func NewRouter() *router {
+	return &router{
 		trees: map[string]*node{},
 	}
 }
 
-
-// addRouter 增加路由
-func(r * Router) addRouter(method, path string, handle HandleFunc) {
+func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 
 }
-
-
