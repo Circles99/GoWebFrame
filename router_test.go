@@ -2,6 +2,7 @@ package GoWebFrame
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"reflect"
 	"testing"
@@ -75,7 +76,7 @@ func TestRouter_AddRouter(t *testing.T) {
 	}
 
 	msg, ok := wantRouter.equal(r)
-
+	assert.True(t, ok, msg)
 }
 
 // equal 比较路由
