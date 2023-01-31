@@ -5,9 +5,10 @@ import (
 	"net/http"
 )
 
-
 // 确保一定实现了接口
 var _ Server = &HttpServer{}
+
+type HandleFunc func(c *Context)
 
 type Server interface {
 	http.Handler
@@ -15,25 +16,21 @@ type Server interface {
 	Start(addr string) error
 }
 
-
-
-
 type HttpServer struct {
-		
+	*router
 }
 
 func (h *HttpServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	ctx := &Context{
-		Req: request,
+		Req:  request,
 		Resp: writer,
 	}
 	h.serve(ctx)
 }
 
-func (h *HttpServer)serve(ctx *Context) {
+func (h *HttpServer) serve(ctx *Context) {
 	// 查找路由，执行命中业务逻辑
 }
-
 
 func (h *HttpServer) Start(addr string) error {
 	l, err := net.Listen("tcp", addr)
@@ -44,7 +41,3 @@ func (h *HttpServer) Start(addr string) error {
 	// 执行一些业务前置操作条件
 	return http.Serve(l, h)
 }
-
-
-
-
