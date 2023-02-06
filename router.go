@@ -61,6 +61,11 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 
 }
 
+// findRoute 查找路由
+func (r *router) findRoute(method string, path string) (*node, bool) {
+
+}
+
 // childOrCreate 子节点创建
 func (n *node) childOrCreate(path string) *node {
 
