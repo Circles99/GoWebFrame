@@ -18,9 +18,11 @@ type router struct {
 // @author liujiming
 // @date 2023-01-31 15:57:04
 type node struct {
-	path     string           //路径
-	children map[string]*node // 子节点
-	handler  HandleFunc
+	path          string           //路径
+	children      map[string]*node // 子节点
+	handler       HandleFunc
+	adaptiveChild *node // 模糊匹配
+	paramsChild   *node // 参数匹配
 }
 
 func NewRouter() *router {
@@ -111,6 +113,12 @@ func (n *node) childOf(path string) (*node, bool) {
 
 // childOrCreate 子节点创建
 func (n *node) childOrCreate(path string) *node {
+	// 通配符匹配
+	if path == "*" {
+		n.adaptiveChild = &node{
+			path: path,
+		}
+	}
 
 	// 当没有子节点时，make一个新的
 	if n.children == nil {

@@ -30,6 +30,30 @@ func (h *HttpServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 
 func (h *HttpServer) serve(ctx *Context) {
 	// 查找路由，执行命中业务逻辑
+	n, ok := h.findRoute(ctx.Req.Method, ctx.Req.URL.Path)
+	if !ok || n.handler == nil {
+		ctx.Resp.WriteHeader(404)
+		ctx.Resp.Write([]byte("Not Found"))
+		return
+	}
+	// 执行业务逻辑
+	n.handler(ctx)
+}
+
+func (h *HttpServer) Get(path string, handler HandleFunc) {
+	h.addRouter(http.MethodGet, path, handler)
+}
+
+func (h *HttpServer) Post(path string, handler HandleFunc) {
+	h.addRouter(http.MethodPost, path, handler)
+}
+
+func (h *HttpServer) Delete(path string, handler HandleFunc) {
+	h.addRouter(http.MethodDelete, path, handler)
+}
+
+func (h *HttpServer) Put(path string, handler HandleFunc) {
+	h.addRouter(http.MethodPut, path, handler)
 }
 
 func (h *HttpServer) Start(addr string) error {
