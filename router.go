@@ -78,10 +78,36 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 
 }
 
-//// findRoute 查找路由
-//func (r *router) findRoute(method string, path string) (*node, bool) {
-//
-//}
+// findRoute 查找路由
+func (r *router) findRoute(method string, path string) (*node, bool) {
+	root, ok := r.trees[method]
+	if !ok {
+		return nil, false
+	}
+	// 根节点直接返回
+	if path == "/" {
+		return root, true
+	}
+
+	for _, s := range strings.Split(strings.Trim(path, "/"), "/") {
+		// 一直往下找，找到并且重新赋值往下
+		root, ok = root.childOf(s)
+		if !ok {
+			return nil, false
+		}
+	}
+	return root, true
+
+}
+
+func (n *node) childOf(path string) (*node, bool) {
+	if n.children == nil {
+		return nil, false
+	}
+
+	root, ok := n.children[path]
+	return root, ok
+}
 
 // childOrCreate 子节点创建
 func (n *node) childOrCreate(path string) *node {
