@@ -35,16 +35,33 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 		panic("path不可等于空")
 	}
 
+	if path[0] != '/' {
+		panic("web: 路由必须以 / 开头")
+	}
+
+	if path != "/" && path[len(path)-1] == '/' {
+		panic("web: 路由不能以 / 结尾")
+	}
+
 	root, ok := r.trees[method]
 	if !ok {
 		// 1： 先建立tress根节点
 		root = &node{path: "/"}
 		r.trees[method] = root
-
 	}
 
+	// 适配只有一个/的情况
+	if path == "/" {
+		if root.handler != nil {
+			panic("路由冲突[/]")
+		}
+		root.handler = handleFunc
+		return
+	}
+
+	segs := strings.Split(path[1:], "/")
 	// 切分path, 因为第一个是/，前面已经创建了根节点，所以从之后开始
-	for _, s := range strings.Split(path[1:], "/") {
+	for _, s := range segs {
 		if s == "" {
 			panic(fmt.Sprint("非法路由"))
 		}
@@ -61,10 +78,10 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 
 }
 
-// findRoute 查找路由
-func (r *router) findRoute(method string, path string) (*node, bool) {
-
-}
+//// findRoute 查找路由
+//func (r *router) findRoute(method string, path string) (*node, bool) {
+//
+//}
 
 // childOrCreate 子节点创建
 func (n *node) childOrCreate(path string) *node {

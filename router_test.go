@@ -39,39 +39,36 @@ func TestRouter_AddRouter(t *testing.T) {
 		},
 	}
 
+	mockHandler := func(ctx *Context) {}
 	r := NewRouter()
-
-	var mockHandleFunc HandleFunc = func(c *Context) {}
-
 	for _, s := range testRouter {
-		r.addRouter(s.method, s.path, mockHandleFunc)
+		r.addRouter(s.method, s.path, mockHandler)
 	}
 
 	wantRouter := &router{
 		trees: map[string]*node{
-			http.MethodGet: &node{
+			http.MethodGet: {
 				path: "/",
 				children: map[string]*node{
 					"user": {
-						path:     "home",
-						children: nil,
-						handler:  mockHandleFunc,
-					},
+						path: "user",
+						children: map[string]*node{
+							"home": {
+								path:    "home",
+								handler: mockHandler},
+						}, handler: mockHandler},
 					"order": {path: "order", children: map[string]*node{
-						"detail": {path: "detail", handler: mockHandleFunc},
+						"detail": {path: "detail", handler: mockHandler},
 					}},
 				},
-				handler: nil,
+				handler: mockHandler,
 			},
-			http.MethodPost: {
-				path: "/",
-				children: map[string]*node{
-					"order": {path: "order", children: map[string]*node{
-						"create": {path: "create", handler: mockHandleFunc},
-					}},
-					"login": {path: "login", handler: mockHandleFunc},
-				},
-			},
+			http.MethodPost: {path: "/", children: map[string]*node{
+				"order": {path: "order", children: map[string]*node{
+					"create": {path: "create", handler: mockHandler},
+				}},
+				"login": {path: "login", handler: mockHandler},
+			}},
 		},
 	}
 
@@ -98,6 +95,11 @@ func (r *router) equal(y *router) (string, bool) {
 
 // equal 比较节点
 func (n *node) equal(y *node) (string, bool) {
+
+	if y == n {
+		return "目标节点为nil", false
+	}
+
 	if len(n.children) != len(y.children) {
 		return fmt.Sprintf("子节点数量不相同"), false
 	}
@@ -107,11 +109,10 @@ func (n *node) equal(y *node) (string, bool) {
 	}
 
 	// 对比handler是否相同
-
-	nHandler := reflect.ValueOf(n.children)
-	yHandler := reflect.ValueOf(y.children)
-	if nHandler != yHandler {
-		return fmt.Sprintf("handler 不一致"), false
+	nhv := reflect.ValueOf(n.handler)
+	yhv := reflect.ValueOf(y.handler)
+	if nhv != yhv {
+		return fmt.Sprintf("%s 节点 handler 不相等 x %s, y %s", n.path, nhv.Type().String(), yhv.Type().String()), false
 	}
 
 	// 对比子节点路径
