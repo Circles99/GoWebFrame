@@ -103,6 +103,13 @@ func (r *router) findRoute(method string, path string) (*node, bool) {
 }
 
 func (n *node) childOf(path string) (*node, bool) {
+	// 查找通配符
+	if path == "*" {
+		if n.adaptiveChild != nil {
+			return n.adaptiveChild, true
+		}
+	}
+
 	if n.children == nil {
 		return nil, false
 	}
@@ -118,6 +125,16 @@ func (n *node) childOrCreate(path string) *node {
 		n.adaptiveChild = &node{
 			path: path,
 		}
+		return n.adaptiveChild
+	}
+
+	// 参数匹配
+	if path[0] == ':' {
+		//if n.paramsChild == nil {
+		//
+		//}
+		n.paramsChild = &node{path: path}
+		return n.paramsChild
 	}
 
 	// 当没有子节点时，make一个新的
