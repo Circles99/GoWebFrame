@@ -25,6 +25,11 @@ type node struct {
 	paramsChild   *node // 参数匹配
 }
 
+type matchInfo struct {
+	node        *node
+	patchParams map[string]string
+}
+
 func NewRouter() *router {
 	return &router{
 		trees: map[string]*node{},
@@ -81,60 +86,105 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 }
 
 // findRoute 查找路由
-func (r *router) findRoute(method string, path string) (*node, bool) {
+func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 	root, ok := r.trees[method]
 	if !ok {
 		return nil, false
 	}
 	// 根节点直接返回
 	if path == "/" {
-		return root, true
+		return &matchInfo{node: root}, true
 	}
 
+	var pathParams map[string]string
+
 	for _, s := range strings.Split(strings.Trim(path, "/"), "/") {
+
 		// 一直往下找，找到并且重新赋值往下
-		root, ok = root.childOf(s)
+		child, paramChild, ok := root.childOf(s)
 		if !ok {
 			return nil, false
 		}
+
+		// 命中了路径参数
+		if paramChild {
+			if pathParams == nil {
+				pathParams = make(map[string]string)
+			}
+			//  path是：id, 所以获取第一位之后的
+			pathParams[child.path[1:]] = s
+		}
+
 	}
-	return root, true
+	return &matchInfo{
+		node:        root,
+		patchParams: pathParams,
+	}, true
 
 }
 
-func (n *node) childOf(path string) (*node, bool) {
-	// 查找通配符
-	if path == "*" {
-		if n.adaptiveChild != nil {
-			return n.adaptiveChild, true
-		}
-	}
+// childOf
+// @Description:
+// @receiver n
+// @param path
+// @return *node 子节点
+// @return bool 标记是否是路径参数
+// @return bool 标记是否命中
+func (n *node) childOf(path string) (*node, bool, bool) {
 
 	if n.children == nil {
-		return nil, false
+		if n.paramsChild != nil {
+			return n.paramsChild, true, true
+		}
+
+		// 下级为nil， 判断是否是通配符匹配
+		return n.adaptiveChild, false, n.adaptiveChild != nil
 	}
 
 	root, ok := n.children[path]
-	return root, ok
+	if !ok {
+		// 当没有子节点时
+		// 判断是否是通配符或者参数匹配
+
+		if n.paramsChild != nil {
+			return n.paramsChild, true, true
+		}
+		return n.adaptiveChild, false, n.adaptiveChild != nil
+	}
+
+	return root, false, ok
 }
 
 // childOrCreate 子节点创建
 func (n *node) childOrCreate(path string) *node {
-	// 通配符匹配
-	if path == "*" {
-		n.adaptiveChild = &node{
-			path: path,
-		}
-		return n.adaptiveChild
-	}
+
+	// 不允许同时注册参数匹配或者通配符匹配路由
 
 	// 参数匹配
 	if path[0] == ':' {
-		//if n.paramsChild == nil {
-		//
-		//}
-		n.paramsChild = &node{path: path}
+		if n.adaptiveChild != nil {
+			panic("web: 不允许同时注册路径参数匹配和通配符匹配, 已有通配符匹配")
+		}
+
+		if n.paramsChild == nil {
+			n.paramsChild = &node{path: path}
+		}
+
 		return n.paramsChild
+	}
+
+	// 通配符匹配
+	if path == "*" {
+		if n.paramsChild != nil {
+			panic("web: 不允许同时注册路径参数匹配和通配符匹配, 已有路径参数")
+		}
+
+		if n.adaptiveChild == nil {
+			n.adaptiveChild = &node{
+				path: path,
+			}
+		}
+		return n.adaptiveChild
 	}
 
 	// 当没有子节点时，make一个新的

@@ -31,13 +31,13 @@ func (h *HttpServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 func (h *HttpServer) serve(ctx *Context) {
 	// 查找路由，执行命中业务逻辑
 	n, ok := h.findRoute(ctx.Req.Method, ctx.Req.URL.Path)
-	if !ok || n.handler == nil {
+	if !ok || n.node.handler == nil {
 		ctx.Resp.WriteHeader(404)
 		ctx.Resp.Write([]byte("Not Found"))
 		return
 	}
 	// 执行业务逻辑
-	n.handler(ctx)
+	n.node.handler(ctx)
 }
 
 func (h *HttpServer) Get(path string, handler HandleFunc) {

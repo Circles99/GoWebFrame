@@ -108,6 +108,20 @@ func (n *node) equal(y *node) (string, bool) {
 		return fmt.Sprintf("节点路径不匹配"), false
 	}
 
+	if n.adaptiveChild != nil {
+		msg, ok := n.adaptiveChild.equal(y.adaptiveChild)
+		if !ok {
+			return msg, ok
+		}
+	}
+
+	if n.paramsChild != nil {
+		msg, ok := n.paramsChild.equal(y.paramsChild)
+		if !ok {
+			return msg, ok
+		}
+	}
+
 	// 对比handler是否相同
 	nhv := reflect.ValueOf(n.handler)
 	yhv := reflect.ValueOf(y.handler)
@@ -156,11 +170,11 @@ func TestFindRouter(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name     string
-		method   string
-		path     string
-		found    bool
-		wantNode *node
+		name   string
+		method string
+		path   string
+		found  bool
+		info   *matchInfo
 	}{
 		{
 			name:   "method not found",
@@ -176,9 +190,11 @@ func TestFindRouter(t *testing.T) {
 			method: http.MethodGet,
 			path:   "/",
 			found:  true,
-			wantNode: &node{
-				path:    "/",
-				handler: mockHandler,
+			info: &matchInfo{
+				node: &node{
+					path:    "/",
+					handler: mockHandler,
+				},
 			},
 		},
 		{
@@ -186,9 +202,11 @@ func TestFindRouter(t *testing.T) {
 			method: http.MethodGet,
 			path:   "/user",
 			found:  true,
-			wantNode: &node{
-				path:    "user",
-				handler: mockHandler,
+			info: &matchInfo{
+				node: &node{
+					path:    "user",
+					handler: mockHandler,
+				},
 			},
 		},
 		{
@@ -196,8 +214,10 @@ func TestFindRouter(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/order",
 			found:  true,
-			wantNode: &node{
-				path: "order",
+			info: &matchInfo{
+				node: &node{
+					path: "order",
+				},
 			},
 		},
 		{
@@ -205,9 +225,11 @@ func TestFindRouter(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/order/create",
 			found:  true,
-			wantNode: &node{
-				path:    "create",
-				handler: mockHandler,
+			info: &matchInfo{
+				node: &node{
+					path:    "create",
+					handler: mockHandler,
+				},
 			},
 		},
 	}
@@ -218,8 +240,8 @@ func TestFindRouter(t *testing.T) {
 			if !found {
 				return
 			}
-			wantVal := reflect.ValueOf(tc.wantNode.handler)
-			nVal := reflect.ValueOf(n.handler)
+			wantVal := reflect.ValueOf(tc.info.node.handler)
+			nVal := reflect.ValueOf(n.node.handler)
 			assert.Equal(t, wantVal, nVal)
 		})
 	}
