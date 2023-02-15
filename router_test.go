@@ -165,6 +165,10 @@ func TestFindRouter(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/login/:username",
 		},
+		{
+			method: http.MethodGet,
+			path:   "/query/:id(.*)",
+		},
 	}
 
 	mockHandler := func(ctx *Context) {}
@@ -236,14 +240,26 @@ func TestFindRouter(t *testing.T) {
 		//		},
 		//	},
 		//},
+		//{
+		//	name:   "login username",
+		//	method: http.MethodPost,
+		//	path:   "/login/ljm",
+		//	found:  true,
+		//	info: &matchInfo{
+		//		node: &node{
+		//			path:    ":username",
+		//			handler: mockHandler,
+		//		},
+		//	},
+		//},
 		{
-			name:   "login username",
-			method: http.MethodPost,
-			path:   "/login/ljm",
+			name:   "query id",
+			method: http.MethodGet,
+			path:   "/query/西瓜西瓜",
 			found:  true,
 			info: &matchInfo{
 				node: &node{
-					path:    ":username",
+					path:    ":id(.*)",
 					handler: mockHandler,
 				},
 			},
@@ -256,6 +272,7 @@ func TestFindRouter(t *testing.T) {
 			if !found {
 				return
 			}
+			fmt.Println(n.patchParams)
 			wantVal := reflect.ValueOf(tc.info.node.handler)
 			nVal := reflect.ValueOf(n.node.handler)
 			assert.Equal(t, wantVal, nVal)

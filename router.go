@@ -116,7 +116,7 @@ func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 				pathParams = make(map[string]string)
 			}
 			//  path是：id, 所以获取第一位之后的
-			pathParams[child.path[1:]] = s
+			pathParams[child.paramName] = s
 		}
 		root = child
 
@@ -139,7 +139,6 @@ func (n *node) childOf(path string) (*node, bool) {
 
 	// 无子节点的时候，查询是否是路径参数
 	if n.children == nil {
-
 		if n.regxChild != nil {
 			if n.regxChild.regx.Match([]byte(path)) {
 				return n.regxChild, true
@@ -159,6 +158,11 @@ func (n *node) childOf(path string) (*node, bool) {
 	if !ok {
 		// 当没有子节点时
 		// 判断是否是通配符或者参数匹配
+		if n.regxChild != nil {
+			if n.regxChild.regx.Match([]byte(path)) {
+				return n.regxChild, true
+			}
+		}
 
 		if n.paramsChild != nil {
 			return n.paramsChild, true
