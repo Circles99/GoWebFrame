@@ -114,6 +114,7 @@ func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 			//  path是：id, 所以获取第一位之后的
 			pathParams[child.path[1:]] = s
 		}
+		root = child
 
 	}
 	return &matchInfo{
@@ -132,6 +133,7 @@ func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 // @return bool 标记是否命中
 func (n *node) childOf(path string) (*node, bool, bool) {
 
+	// 无子节点的时候，查询是否是路径参数
 	if n.children == nil {
 		if n.paramsChild != nil {
 			return n.paramsChild, true, true
@@ -142,6 +144,7 @@ func (n *node) childOf(path string) (*node, bool, bool) {
 	}
 
 	root, ok := n.children[path]
+
 	if !ok {
 		// 当没有子节点时
 		// 判断是否是通配符或者参数匹配

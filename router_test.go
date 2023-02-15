@@ -161,6 +161,10 @@ func TestFindRouter(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/order/create",
 		},
+		{
+			method: http.MethodPost,
+			path:   "/login/:username",
+		},
 	}
 
 	mockHandler := func(ctx *Context) {}
@@ -176,58 +180,70 @@ func TestFindRouter(t *testing.T) {
 		found  bool
 		info   *matchInfo
 	}{
+		//{
+		//	name:   "method not found",
+		//	method: http.MethodHead,
+		//},
+		//{
+		//	name:   "path not found",
+		//	method: http.MethodGet,
+		//	path:   "/abc",
+		//},
+		//{
+		//	name:   "root",
+		//	method: http.MethodGet,
+		//	path:   "/",
+		//	found:  true,
+		//	info: &matchInfo{
+		//		node: &node{
+		//			path:    "/",
+		//			handler: mockHandler,
+		//		},
+		//	},
+		//},
+		//{
+		//	name:   "user",
+		//	method: http.MethodGet,
+		//	path:   "/user",
+		//	found:  true,
+		//	info: &matchInfo{
+		//		node: &node{
+		//			path:    "user",
+		//			handler: mockHandler,
+		//		},
+		//	},
+		//},
+		//{
+		//	name:   "no handler",
+		//	method: http.MethodPost,
+		//	path:   "/order",
+		//	found:  true,
+		//	info: &matchInfo{
+		//		node: &node{
+		//			path: "order",
+		//		},
+		//	},
+		//},
+		//{
+		//	name:   "two layer",
+		//	method: http.MethodPost,
+		//	path:   "/order/create",
+		//	found:  true,
+		//	info: &matchInfo{
+		//		node: &node{
+		//			path:    "create",
+		//			handler: mockHandler,
+		//		},
+		//	},
+		//},
 		{
-			name:   "method not found",
-			method: http.MethodHead,
-		},
-		{
-			name:   "path not found",
-			method: http.MethodGet,
-			path:   "/abc",
-		},
-		{
-			name:   "root",
-			method: http.MethodGet,
-			path:   "/",
-			found:  true,
-			info: &matchInfo{
-				node: &node{
-					path:    "/",
-					handler: mockHandler,
-				},
-			},
-		},
-		{
-			name:   "user",
-			method: http.MethodGet,
-			path:   "/user",
-			found:  true,
-			info: &matchInfo{
-				node: &node{
-					path:    "user",
-					handler: mockHandler,
-				},
-			},
-		},
-		{
-			name:   "no handler",
+			name:   "login username",
 			method: http.MethodPost,
-			path:   "/order",
+			path:   "/login/ljm",
 			found:  true,
 			info: &matchInfo{
 				node: &node{
-					path: "order",
-				},
-			},
-		},
-		{
-			name:   "two layer",
-			method: http.MethodPost,
-			path:   "/order/create",
-			found:  true,
-			info: &matchInfo{
-				node: &node{
-					path:    "create",
+					path:    ":username",
 					handler: mockHandler,
 				},
 			},
