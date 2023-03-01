@@ -36,6 +36,8 @@ func (h *HttpServer) serve(ctx *Context) {
 		ctx.Resp.Write([]byte("Not Found"))
 		return
 	}
+	// 赋值给ctx上下文
+	ctx.PathParams = n.patchParams
 	// 执行业务逻辑
 	n.node.handler(ctx)
 }

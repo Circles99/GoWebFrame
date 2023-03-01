@@ -10,7 +10,7 @@ import (
 type Context struct {
 	Req              *http.Request
 	Resp             http.ResponseWriter
-	PathParams       *matchInfo
+	PathParams       map[string]string
 	cacheQueryValues url.Values
 }
 
