@@ -28,7 +28,7 @@ type node struct {
 	regx          *regexp.Regexp //需要匹配的正则
 	paramName     string         // 参数名
 	mdls          []Middleware   // 载入的middware
-	route         string
+	route         string         // 匹配的路由
 }
 
 type matchInfo struct {
@@ -43,7 +43,7 @@ func NewRouter() *router {
 	}
 }
 
-func (r *router) AddRouter(method, path string, handleFunc HandleFunc, mds ...Middleware) {
+func (r *router) addRouter(method, path string, handleFunc HandleFunc, mds ...Middleware) {
 	if path == "" {
 		// path不能等于空
 		panic("path不可等于空")
@@ -96,8 +96,8 @@ func (r *router) AddRouter(method, path string, handleFunc HandleFunc, mds ...Mi
 
 }
 
-// FindRoute 查找路由
-func (r *router) FindRoute(method string, path string) (*matchInfo, bool) {
+// findRoute 查找路由
+func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 	root, ok := r.trees[method]
 	if !ok {
 		return nil, false

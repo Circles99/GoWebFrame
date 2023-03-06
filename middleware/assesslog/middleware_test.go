@@ -12,10 +12,10 @@ func TestMiddlewareBuild_Build(t *testing.T) {
 
 	//r := GoWebFrame.NewRouter()
 
-	//r.AddRouter("GET", "/user/eee", func(c *GoWebFrame.Context) {
+	//r.addRouter("GET", "/user/eee", func(c *GoWebFrame.Context) {
 	//	fmt.Println("你好")
 	//}, b.Build())
-	//e, _ := r.FindRoute("GET", "user/eee")
+	//e, _ := r.findRoute("GET", "user/eee")
 	//fmt.Println(e)
 	h.Get("/user/eee", func(c *GoWebFrame.Context) {
 		c.RespData = []byte("<Html><h1>你好</h1></Html>")

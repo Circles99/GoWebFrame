@@ -38,7 +38,7 @@ func (h *HttpServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 
 func (h *HttpServer) serve(ctx *Context) {
 	// 查找路由，执行命中业务逻辑
-	n, ok := h.FindRoute(ctx.Req.Method, ctx.Req.URL.Path)
+	n, ok := h.findRoute(ctx.Req.Method, ctx.Req.URL.Path)
 	if !ok || n.node.handler == nil {
 		ctx.Resp.WriteHeader(404)
 		ctx.Resp.Write([]byte("Not Found"))
@@ -85,23 +85,23 @@ func (h *HttpServer) serve(ctx *Context) {
 
 // Use 加载中间件
 func (h *HttpServer) Use(method string, path string, mdls ...Middleware) {
-	h.AddRouter(method, path, nil, mdls...)
+	h.addRouter(method, path, nil, mdls...)
 }
 
 func (h *HttpServer) Get(path string, handler HandleFunc, mdls ...Middleware) {
-	h.AddRouter(http.MethodGet, path, handler, mdls...)
+	h.addRouter(http.MethodGet, path, handler, mdls...)
 }
 
 func (h *HttpServer) Post(path string, handler HandleFunc) {
-	h.AddRouter(http.MethodPost, path, handler)
+	h.addRouter(http.MethodPost, path, handler)
 }
 
 func (h *HttpServer) Delete(path string, handler HandleFunc) {
-	h.AddRouter(http.MethodDelete, path, handler)
+	h.addRouter(http.MethodDelete, path, handler)
 }
 
 func (h *HttpServer) Put(path string, handler HandleFunc) {
-	h.AddRouter(http.MethodPut, path, handler)
+	h.addRouter(http.MethodPut, path, handler)
 }
 
 func (h *HttpServer) Start(addr string) error {
