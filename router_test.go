@@ -42,7 +42,7 @@ func TestRouter_AddRouter(t *testing.T) {
 	mockHandler := func(ctx *Context) {}
 	r := NewRouter()
 	for _, s := range testRouter {
-		r.addRouter(s.method, s.path, mockHandler)
+		r.AddRouter(s.method, s.path, mockHandler)
 	}
 
 	wantRouter := &router{
@@ -174,7 +174,7 @@ func TestFindRouter(t *testing.T) {
 	mockHandler := func(ctx *Context) {}
 	r := NewRouter()
 	for _, s := range testRouter {
-		r.addRouter(s.method, s.path, mockHandler)
+		r.AddRouter(s.method, s.path, mockHandler)
 	}
 
 	testCases := []struct {
@@ -267,7 +267,7 @@ func TestFindRouter(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			n, found := r.findRoute(tc.method, tc.path)
+			n, found := r.FindRoute(tc.method, tc.path)
 			assert.Equal(t, tc.found, found)
 			if !found {
 				return

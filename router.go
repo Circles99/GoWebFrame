@@ -27,10 +27,13 @@ type node struct {
 	regxChild     *node          //正则表达式匹配
 	regx          *regexp.Regexp //需要匹配的正则
 	paramName     string         // 参数名
+	mdls          []Middleware   // 载入的middware
+	route         string
 }
 
 type matchInfo struct {
 	node        *node
+	Mdls        []Middleware
 	patchParams map[string]string
 }
 
@@ -40,7 +43,7 @@ func NewRouter() *router {
 	}
 }
 
-func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
+func (r *router) AddRouter(method, path string, handleFunc HandleFunc, mds ...Middleware) {
 	if path == "" {
 		// path不能等于空
 		panic("path不可等于空")
@@ -67,6 +70,7 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 			panic("路由冲突[/]")
 		}
 		root.handler = handleFunc
+		root.mdls = mds
 		return
 	}
 
@@ -86,45 +90,54 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc) {
 		panic(fmt.Sprintf("web: 路由冲突[%s]", path))
 	}
 	root.handler = handleFunc
+	// context中MatchedRoute
+	root.route = path
+	root.mdls = mds
 
 }
 
-// findRoute 查找路由
-func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
+// FindRoute 查找路由
+func (r *router) FindRoute(method string, path string) (*matchInfo, bool) {
 	root, ok := r.trees[method]
 	if !ok {
 		return nil, false
 	}
 	// 根节点直接返回
 	if path == "/" {
-		return &matchInfo{node: root}, true
+		return &matchInfo{node: root, Mdls: root.mdls}, true
 	}
 
 	var pathParams map[string]string
 
+	mi := matchInfo{}
+	cur := root
+
 	for _, s := range strings.Split(strings.Trim(path, "/"), "/") {
 
 		// 一直往下找，找到并且重新赋值往下
-		child, ok := root.childOf(s)
+		cur, ok = cur.childOf(s)
 		if !ok {
 			return nil, false
 		}
 
-		// 命中了路径参数
-		if child.paramName != "" {
+		// 命中了路径参数, 判断paramName 有无值，来判断是否为参数路口
+		if cur.paramName != "" {
 			if pathParams == nil {
 				pathParams = make(map[string]string)
 			}
 			//  path是：id, 所以获取第一位之后的
-			pathParams[child.paramName] = s
+			pathParams[cur.paramName] = s
 		}
-		root = child
 
 	}
-	return &matchInfo{
-		node:        root,
-		patchParams: pathParams,
-	}, true
+
+	// 节点等于当前最后节点
+	mi.node = cur
+	// 获取 middleware
+	// todo 是否需要下级每个节点都需要middleware,  如需要，则需要更改获取下级所有节点
+	mi.Mdls = cur.mdls
+	mi.patchParams = pathParams
+	return &mi, true
 
 }
 

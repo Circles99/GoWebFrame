@@ -12,6 +12,9 @@ type Context struct {
 	Resp             http.ResponseWriter
 	PathParams       map[string]string
 	cacheQueryValues url.Values
+	RespStatusCode   int
+	RespData         []byte
+	MatchedRoute     string // 匹配的路由
 }
 
 type StringValue struct {
