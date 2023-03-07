@@ -24,6 +24,7 @@ func (b MiddleWareBuilder) Builder() GoWebFrame.Middleware {
 			reqCtx := ctx.Req.Context()
 			// http之间通信， 从入参context中的头部获取
 			reqCtx = otel.GetTextMapPropagator().Extract(reqCtx, propagation.HeaderCarrier{})
+
 			reqCtx, span := b.Tracer.Start(reqCtx, "opentelemetryMiddleware", trace.WithAttributes())
 			// 设置值
 			span.SetAttributes(attribute.String("http.method", ctx.Req.Method))
@@ -37,8 +38,13 @@ func (b MiddleWareBuilder) Builder() GoWebFrame.Middleware {
 
 			// 函数退出时，关闭span
 			defer span.End()
+			// reqCtx和span挂钩之后，未和ctx.Req.Context挂钩，导致关联不上
+			ctx.Req = ctx.Req.WithContext(reqCtx)
+
 			next(ctx)
 			span.SetAttributes(attribute.Int("http.status", ctx.RespStatusCode))
+
+			span.SetName(ctx.MatchedRoute)
 		}
 
 	}
