@@ -92,16 +92,16 @@ func (h *HttpServer) Get(path string, handler HandleFunc, mdls ...Middleware) {
 	h.addRouter(http.MethodGet, path, handler, mdls...)
 }
 
-func (h *HttpServer) Post(path string, handler HandleFunc) {
-	h.addRouter(http.MethodPost, path, handler)
+func (h *HttpServer) Post(path string, handler HandleFunc, mdls ...Middleware) {
+	h.addRouter(http.MethodPost, path, handler, mdls...)
 }
 
-func (h *HttpServer) Delete(path string, handler HandleFunc) {
-	h.addRouter(http.MethodDelete, path, handler)
+func (h *HttpServer) Delete(path string, handler HandleFunc, mdls ...Middleware) {
+	h.addRouter(http.MethodDelete, path, handler, mdls...)
 }
 
-func (h *HttpServer) Put(path string, handler HandleFunc) {
-	h.addRouter(http.MethodPut, path, handler)
+func (h *HttpServer) Put(path string, handler HandleFunc, mdls ...Middleware) {
+	h.addRouter(http.MethodPut, path, handler, mdls...)
 }
 
 func (h *HttpServer) Start(addr string) error {
