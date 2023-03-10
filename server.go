@@ -60,6 +60,10 @@ func (h *HttpServer) serve(ctx *Context) {
 		// 执行业务逻辑
 		n.node.handler(ctx)
 	}
+	// n.Mdls = [1m, 2m]
+	// 2M(handler) -> 1m(2m)
+	// m(1m)   m 是flashResp
+	//  m  next => 1m  next -> 2m  next-> handler  return ====>   2m  return-> 1m  return-> m
 
 	// 从后往前组装middleware
 	for i := len(n.Mdls) - 1; i >= 0; i-- {
