@@ -10,6 +10,9 @@ import (
 // 确保一定实现了接口
 var _ Server = &HttpServer{}
 
+// HttpServerOption 选项参数
+type HttpServerOption func(server *HttpServer)
+
 type HandleFunc func(c *Context)
 
 type Server interface {
@@ -20,11 +23,26 @@ type Server interface {
 
 type HttpServer struct {
 	*router
+	tplEngine TemplateEngine
 }
 
-func NewHttpServer() *HttpServer {
-	return &HttpServer{
+func NewHttpServer(opts ...HttpServerOption) *HttpServer {
+	s := &HttpServer{
 		router: NewRouter(),
+	}
+
+	// 给HttpServer添加选项参数.传入指针，在内部给指针httpServer赋值
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
+}
+
+// ServerWithTemplateEngine server 关联 templateEngine
+func ServerWithTemplateEngine(engine TemplateEngine) HttpServerOption {
+	return func(server *HttpServer) {
+		server.tplEngine = engine
 	}
 }
 
