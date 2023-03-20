@@ -101,3 +101,7 @@ func (c *Context) Reader(tplName string, data any) error {
 	return nil
 
 }
+
+func (s StringValue) String() (string, error) {
+	return s.val, s.err
+}
