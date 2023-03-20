@@ -23,7 +23,7 @@ type Server interface {
 
 type HttpServer struct {
 	*router
-	tplEngine TemplateEngine
+	tplEngine *TemplateEngine
 }
 
 func NewHttpServer(opts ...HttpServerOption) *HttpServer {
@@ -40,7 +40,7 @@ func NewHttpServer(opts ...HttpServerOption) *HttpServer {
 }
 
 // ServerWithTemplateEngine server 关联 templateEngine
-func ServerWithTemplateEngine(engine TemplateEngine) HttpServerOption {
+func ServerWithTemplateEngine(engine *TemplateEngine) HttpServerOption {
 	return func(server *HttpServer) {
 		server.tplEngine = engine
 	}
@@ -48,8 +48,9 @@ func ServerWithTemplateEngine(engine TemplateEngine) HttpServerOption {
 
 func (h *HttpServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	ctx := &Context{
-		Req:  request,
-		Resp: writer,
+		Req:       request,
+		Resp:      writer,
+		TplEngine: h.tplEngine,
 	}
 	h.serve(ctx)
 }
@@ -82,6 +83,12 @@ func (h *HttpServer) serve(ctx *Context) {
 	// 2M(handler) -> 1m(2m)
 	// m(1m)   m 是flashResp
 	//  m  next => 1m  next -> 2m  next-> handler  return ====>   2m  return-> 1m  return-> m
+
+	// 顺序执行, 实际上没啥区别，只要handler是第一个放进去的即可
+	// n.Mdls = [1m, 2m]
+	// 1M(handler) -> 2m(1m)
+	// m(2m)   m 是flashResp
+	// m => 2m -> 1m -> handler -> 1m -> 2m -> m
 
 	// 从后往前组装middleware
 	for i := len(n.Mdls) - 1; i >= 0; i-- {
@@ -143,7 +150,6 @@ func (h *HttpServer) flashResp(ctx *Context) {
 	ctx.Resp.Header().Set("Content-Length", strconv.Itoa(len(ctx.RespData)))
 	_, err := ctx.Resp.Write(ctx.RespData)
 	if err != nil {
-		// s.log.Fatalln("回写响应失败", err)
-		log.Fatalf("回写响应失败", err)
+		log.Fatalln("回写响应失败", err)
 	}
 }

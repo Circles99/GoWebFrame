@@ -15,6 +15,7 @@ type Context struct {
 	RespStatusCode   int
 	RespData         []byte
 	MatchedRoute     string // 匹配的路由
+	TplEngine        TemplateInterface
 }
 
 type StringValue struct {
@@ -79,4 +80,24 @@ func (c *Context) RespJson(val any) error {
 	}
 	c.Resp.Header().Set("Content-Type", "application/json")
 	return nil
+}
+
+// Reader
+// @Description: 跳转
+// @receiver c
+// @param tplName
+// @param data
+// @return error
+func (c *Context) Reader(tplName string, data any) error {
+	var err error
+	c.RespData, err = c.TplEngine.Render(c.Req.Context(), tplName, data)
+	c.RespStatusCode = http.StatusOK
+
+	if err != nil {
+		c.RespStatusCode = http.StatusInternalServerError
+		return err
+	}
+
+	return nil
+
 }
