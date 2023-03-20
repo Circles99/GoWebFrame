@@ -118,48 +118,47 @@ func NewStaticResourceHandler(dir string, pathPrefix string,
 	return res
 }
 
-func (s *StaticResourceHandler) Handler() HandleFunc {
-	return func(c *Context) {
-		req := c.PathParams["file"]
+func (s *StaticResourceHandler) Handler(c *Context) {
 
-		if item, ok := s.readFileFromData(req); ok {
-			s.writeItemAsResponse(item, c.Resp)
-			return
-		}
+	req := c.PathParams["file"]
 
-		path := filepath.Join(s.dir, req)
-
-		f, err := os.Open(path)
-		if err != nil {
-			c.Resp.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		ext := getFileExt(f.Name())
-		t, ok := s.extensionContentTypeMap[ext]
-		if !ok {
-			c.Resp.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		data, err := ioutil.ReadAll(f)
-
-		if err != nil {
-			c.Resp.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		item := &fileCacheItem{
-			fileSize:    len(data),
-			data:        data,
-			contentType: t,
-			fileName:    req,
-		}
-		s.cacheFile(item)
+	if item, ok := s.readFileFromData(req); ok {
 		s.writeItemAsResponse(item, c.Resp)
 		return
-
 	}
+
+	path := filepath.Join(s.dir, req)
+
+	f, err := os.Open(path)
+	if err != nil {
+		c.Resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ext := getFileExt(f.Name())
+	t, ok := s.extensionContentTypeMap[ext]
+	if !ok {
+		c.Resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	data, err := ioutil.ReadAll(f)
+
+	if err != nil {
+		c.Resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	item := &fileCacheItem{
+		fileSize:    len(data),
+		data:        data,
+		contentType: t,
+		fileName:    req,
+	}
+	s.cacheFile(item)
+	s.writeItemAsResponse(item, c.Resp)
+	return
+
 }
 
 func (s *StaticResourceHandler) writeItemAsResponse(item *fileCacheItem, writer http.ResponseWriter) {
