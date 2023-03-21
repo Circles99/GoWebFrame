@@ -2,6 +2,7 @@ package GoWebFrame
 
 import (
 	"fmt"
+	"github.com/hashicorp/golang-lru"
 	"io"
 	"io/ioutil"
 	"log"
