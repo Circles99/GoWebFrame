@@ -16,6 +16,7 @@ type Context struct {
 	RespData         []byte
 	MatchedRoute     string // 匹配的路由
 	TplEngine        TemplateInterface
+	UserValues       map[string]any
 }
 
 type StringValue struct {
