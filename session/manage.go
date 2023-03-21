@@ -14,7 +14,7 @@ func (m *Manager) GetSession(ctx *GoWebFrame.Context) (Session, error) {
 	if ctx.UserValues == nil {
 		ctx.UserValues = make(map[string]any, 1)
 	}
-
+	// 缓存
 	val, ok := ctx.UserValues[m.SessCtxKey]
 	if ok {
 		return val.(Session), nil
