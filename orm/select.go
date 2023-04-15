@@ -3,13 +3,13 @@ package orm
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 )
 
 type Selector[T any] struct {
 	sb    *strings.Builder // sb在指针中也会引起复制，所以需要获取指针
 	tbl   string
+	model *model
 	where []Predicate
 	args  []any
 }
@@ -30,16 +30,22 @@ func (s *Selector[T]) Where() *Selector[T] {
 
 func (s *Selector[T]) Build() (*Query, error) {
 	s.sb = &strings.Builder{}
+	var err error
+	s.model, err = parseModel(new(T))
+	if err != nil {
+		return nil, err
+	}
 
 	s.sb.WriteString("SELECT * FROM ")
 
 	if s.tbl == "" {
-		var t T
-		// 获取类型
-		typ := reflect.TypeOf(t)
+		//var t T
+		//// 获取类型
+		//typ := reflect.TypeOf(t)
 		// 获取名字
 		s.sb.WriteString("`")
-		s.sb.WriteString(typ.Name())
+		//s.sb.WriteString(typ.Name())
+		s.sb.WriteString(s.model.tableName)
 		s.sb.WriteString("`")
 	} else {
 		s.sb.WriteString(s.tbl)
@@ -75,6 +81,8 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	panic("implement me")
 }
 
+// buildExpression
+// Expression 是从 sql where 中获取的字段， model中的field 从 struct中获取
 func (s *Selector[T]) buildExpression(e Expression) error {
 	switch expr := e.(type) {
 	case nil:
@@ -108,8 +116,13 @@ func (s *Selector[T]) buildExpression(e Expression) error {
 		}
 
 	case Column:
+
+		fd, ok := s.model.fields[expr.name]
+		if !ok {
+			return fmt.Errorf("位置字段： %v", expr.name)
+		}
 		s.sb.WriteByte('`')
-		s.sb.WriteString(expr.name)
+		s.sb.WriteString(fd.colName)
 		s.sb.WriteByte('`')
 	case Value:
 		s.sb.WriteByte('?')
