@@ -9,13 +9,23 @@ import (
 type Selector[T any] struct {
 	sb    *strings.Builder // sb在指针中也会引起复制，所以需要获取指针
 	tbl   string
-	model *model
+	model *Model
 	where []Predicate
 	args  []any
+	db    *DB
 }
 
-func NewSelector[T any]() *Selector[T] {
-	return &Selector[T]{}
+// 应该在DB上创建Selector比较合适 golang 不支持这种写法 Method cannot have type parameters
+//func (d DB) NewSelector[T any]() *Selector[T] {
+//	return &Selector[T]{
+//		db: d,
+//	}
+//}
+
+func NewSelector[T any](db *DB) *Selector[T] {
+	return &Selector[T]{
+		db: db,
+	}
 }
 
 // From 加入表名，为了链式调用返回Selector[T]
@@ -24,14 +34,19 @@ func (s *Selector[T]) From(tbl string) *Selector[T] {
 	return s
 }
 
-func (s *Selector[T]) Where() *Selector[T] {
+func (s *Selector[T]) Where(p ...Predicate) *Selector[T] {
+	s.where = append(s.where, p...)
 	return s
 }
 
 func (s *Selector[T]) Build() (*Query, error) {
+	var (
+		t   T
+		err error
+	)
+
 	s.sb = &strings.Builder{}
-	var err error
-	s.model, err = parseModel(new(T))
+	s.model, err = s.db.r.Get(&t)
 	if err != nil {
 		return nil, err
 	}
@@ -52,11 +67,12 @@ func (s *Selector[T]) Build() (*Query, error) {
 	}
 
 	if len(s.where) > 0 {
-		s.sb.WriteString(" WHERE")
+		s.sb.WriteString(" WHERE ")
 		// 拿出第0个, 下面循环从1开始，进行and, 二叉树
 		p := s.where[0]
 		for i := 1; i < len(s.where); i++ {
-			p.And(s.where[1])
+			// 每次返回一个新的predicate,重新赋值
+			p = p.And(s.where[1])
 		}
 		err := s.buildExpression(p)
 		if err != nil {
@@ -67,7 +83,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	s.sb.WriteByte(';')
 	return &Query{
 		SQL:  s.sb.String(),
-		Args: nil,
+		Args: s.args,
 	}, nil
 }
 
@@ -116,7 +132,6 @@ func (s *Selector[T]) buildExpression(e Expression) error {
 		}
 
 	case Column:
-
 		fd, ok := s.model.fields[expr.name]
 		if !ok {
 			return fmt.Errorf("位置字段： %v", expr.name)

@@ -85,3 +85,12 @@ func (p1 Predicate) And(p2 Predicate) Predicate {
 		right: p2,
 	}
 }
+
+// C("id").Eq(12).Or(C("name").Eq("Tom"))
+func (p1 Predicate) Or(p2 Predicate) Predicate {
+	return Predicate{
+		left:  p1,
+		op:    opOR,
+		right: p2,
+	}
+}
