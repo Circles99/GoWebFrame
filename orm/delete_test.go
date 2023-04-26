@@ -1,13 +1,12 @@
 package orm
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-func TestSelector_build(t *testing.T) {
+func TestDelete_build(t *testing.T) {
 	db, _ := NewDB()
 	testCase := []struct {
 		name      string
@@ -17,26 +16,26 @@ func TestSelector_build(t *testing.T) {
 	}{
 		{
 			name: "no from",
-			q:    NewSelector[TestModel](db),
+			q:    NewDelete[TestModel](db),
 			wantQuery: &Query{
-				SQL: "SELECT * FROM `test_model`;",
+				SQL: "DELETE FROM `test_model`;",
 			},
 			wantErr: nil,
 		},
 
 		{
 			name: "from",
-			q:    NewSelector[TestModel](db).From("`TestModel`"),
+			q:    NewDelete[TestModel](db).From("`TestModel1`"),
 			wantQuery: &Query{
-				SQL: "SELECT * FROM `TestModel`;",
+				SQL: "DELETE FROM `TestModel1`;",
 			},
 			wantErr: nil,
 		},
 		{
 			name: "where",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("FirstName").Eq("王胖子是脑残")),
+			q:    NewDelete[TestModel](db).From("`TestModel`").Where(C("FirstName").Eq("王胖子是脑残")),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE `first_name` = ?;",
+				SQL:  "DELETE FROM `TestModel` WHERE `first_name` = ?;",
 				Args: []any{"王胖子是脑残"},
 			},
 			wantErr: nil,
@@ -44,9 +43,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where GT",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("Age").GT(18)),
+			q:    NewDelete[TestModel](db).From("`TestModel`").Where(C("Age").GT(18)),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE `age` > ?;",
+				SQL:  "DELETE FROM `TestModel` WHERE `age` > ?;",
 				Args: []any{18},
 			},
 			wantErr: nil,
@@ -54,9 +53,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where multiple GT",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("Age").GT(18), C("Id").Eq(1)),
+			q:    NewDelete[TestModel](db).From("`TestModel`").Where(C("Age").GT(18), C("Id").Eq(1)),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE (`age` > ?) AND (`id` = ?);",
+				SQL:  "DELETE FROM `TestModel` WHERE (`age` > ?) AND (`id` = ?);",
 				Args: []any{18, 1},
 			},
 			wantErr: nil,
@@ -64,9 +63,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where not",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			q:    NewDelete[TestModel](db).From("`TestModel`").Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE NOT (`id` = ?);",
+				SQL:  "DELETE FROM `TestModel` WHERE  NOT (`id` = ?);",
 				Args: []any{2},
 			},
 			wantErr: nil,
@@ -84,11 +83,4 @@ func TestSelector_build(t *testing.T) {
 			assert.Equal(t, tc.wantQuery, query)
 		})
 	}
-}
-
-type TestModel struct {
-	Id        int64
-	FirstName string
-	Age       int8
-	LastName  *sql.NullString
 }

@@ -16,6 +16,12 @@ type Deleter[T any] struct {
 	agrs      []any
 }
 
+func NewDelete[T any](db *DB) *Deleter[T] {
+	return &Deleter[T]{
+		db: db,
+	}
+}
+
 func (d *Deleter[T]) From(tableName string) *Deleter[T] {
 	d.tableName = tableName
 	return d
@@ -32,7 +38,7 @@ func (d *Deleter[T]) Build() (*Query, error) {
 		err error
 	)
 	d.sb = &strings.Builder{}
-	d.model, err = d.db.r.Get(t)
+	d.model, err = d.db.r.Get(&t)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +67,7 @@ func (d *Deleter[T]) Build() (*Query, error) {
 			return nil, err
 		}
 	}
+	d.sb.WriteString(";")
 	return &Query{
 		SQL:  d.sb.String(),
 		Args: d.agrs,
@@ -72,6 +79,9 @@ func (d *Deleter[T]) Build() (*Query, error) {
 // Expression 这里传入Expression接口 会因为 上述Predicate， value， Column 都是 Expression的实现
 func (d *Deleter[T]) buildExpression(e Expression) error {
 	switch expr := e.(type) {
+	case nil:
+		// Predicate 为nil的情况下
+		return nil
 	case Predicate:
 		_, ok := expr.left.(Predicate)
 		// 不是Predicate 不会加括号
@@ -87,7 +97,9 @@ func (d *Deleter[T]) buildExpression(e Expression) error {
 		}
 
 		// 加入中间符号
+		d.sb.WriteByte(' ')
 		d.sb.WriteString(expr.op.String())
+		d.sb.WriteByte(' ')
 
 		_, ok = expr.right.(Predicate)
 		if ok {
