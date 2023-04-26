@@ -66,7 +66,8 @@ func (r *register) parseModel(entity any) (*Model, error) {
 	typ = typ.Elem()
 
 	numField := typ.NumField()
-	fieldMap := make(map[string]*field, numField)
+	fieldMap := make(map[string]*Field, numField)
+	columnMap := make(map[string]*Field, numField)
 	for i := 0; i < numField; i++ {
 		fd := typ.Field(i)
 
@@ -80,8 +81,18 @@ func (r *register) parseModel(entity any) (*Model, error) {
 		if colName == "" {
 			colName = underscoreName(fd.Name)
 		}
-		fieldMap[fd.Name] = &field{
+		// golang中字段map
+		fieldMap[fd.Name] = &Field{
 			colName: colName,
+			goName:  fd.Name,
+			Typ:     fd.Type,
+		}
+
+		// 数据库字段映射字段
+		columnMap[colName] = &Field{
+			colName: colName,
+			goName:  fd.Name,
+			Typ:     fd.Type,
 		}
 	}
 

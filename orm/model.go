@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"reflect"
 	"unicode"
 )
 
@@ -10,7 +11,8 @@ const (
 
 type Model struct {
 	tableName string
-	fields    map[string]*field
+	fields    map[string]*Field
+	ColumnMap map[string]*Field
 }
 
 // TableName 表名接口
@@ -19,9 +21,13 @@ type TableName interface {
 	TableName() string
 }
 
-type field struct {
+type Field struct {
 	// 列名
 	colName string
+	// 代码结构体名
+	goName string
+	// 类型
+	Typ reflect.Type
 }
 
 type ModelOpt func(model *Model) error

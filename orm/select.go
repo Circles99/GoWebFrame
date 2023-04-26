@@ -88,8 +88,43 @@ func (s *Selector[T]) Build() (*Query, error) {
 }
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
-	//TODO implement me
-	panic("implement me")
+	query, err := s.Build()
+	if err != nil {
+		return nil, err
+	}
+	// 获取数据
+	rows, err := s.db.db.QueryContext(ctx, query.SQL, query.Args)
+	if err != nil {
+		return nil, err
+	}
+
+	// 获取读到的所有列
+	cs, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	//m, err := s.db.r.Get()
+
+	vals := make([]any, 0)
+
+	for _, c := range cs {
+		for fieldName, _ := range s.model.fields {
+			// 字段名
+			if c == fieldName {
+				vals = append(vals, c)
+			}
+		}
+	}
+
+	for rows.Next() {
+		err = rows.Scan(vals...)
+		if err != nil {
+			return nil, err
+		}
+
+	}
+	return nil, nil
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {

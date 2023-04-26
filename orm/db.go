@@ -1,9 +1,12 @@
 package orm
 
+import "database/sql"
+
 type DBOption func(db *DB)
 
 type DB struct {
-	r Register
+	r  Register
+	db *sql.DB
 }
 
 func NewDB(opts ...DBOption) (*DB, error) {
