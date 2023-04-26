@@ -8,6 +8,7 @@ import (
 )
 
 func TestSelector_build(t *testing.T) {
+	db, _ := NewDB()
 	testCase := []struct {
 		name      string
 		q         QueryBuilder
@@ -16,7 +17,7 @@ func TestSelector_build(t *testing.T) {
 	}{
 		{
 			name: "no from",
-			q:    NewSelector[TestModel](),
+			q:    NewSelector[TestModel](db),
 			wantQuery: &Query{
 				SQL: "SELECT * FROM `TestModel`;",
 			},
@@ -25,7 +26,7 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "from",
-			q:    NewSelector[TestModel]().From("`TestModel`"),
+			q:    NewSelector[TestModel](db).From("`TestModel`"),
 			wantQuery: &Query{
 				SQL: "SELECT * FROM `TestModel`;",
 			},
@@ -33,7 +34,7 @@ func TestSelector_build(t *testing.T) {
 		},
 		{
 			name: "where",
-			q:    NewSelector[TestModel]().From("`TestModel`").Where(C("FirstName").Eq("王胖子是脑残")),
+			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("FirstName").Eq("王胖子是脑残")),
 			wantQuery: &Query{
 				SQL:  "SELECT * FROM `TestModel` WHERE `first_name` = ?;",
 				Args: []any{"王胖子是脑残"},
@@ -43,7 +44,7 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where GT",
-			q:    NewSelector[TestModel]().From("`TestModel`").Where(C("Age").GT(18)),
+			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("Age").GT(18)),
 			wantQuery: &Query{
 				SQL:  "SELECT * FROM `TestModel` WHERE `age` > ?;",
 				Args: []any{18},
@@ -53,7 +54,7 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where multiple GT",
-			q:    NewSelector[TestModel]().From("`TestModel`").Where(C("Age").GT(18), C("Id").Eq(1)),
+			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("Age").GT(18), C("Id").Eq(1)),
 			wantQuery: &Query{
 				SQL:  "SELECT * FROM `TestModel` WHERE (`age` > ?) AND (`id` = ?);",
 				Args: []any{18, 1},
@@ -63,7 +64,7 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where not",
-			q:    NewSelector[TestModel]().From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			q:    NewSelector[TestModel](db).From("`TestModel`").Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
 				SQL:  "SELECT * FROM `TestModel` WHERE NOT (`id` = ?);",
 				Args: []any{2},

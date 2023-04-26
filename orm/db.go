@@ -3,12 +3,12 @@ package orm
 type DBOption func(db *DB)
 
 type DB struct {
-	r *register
+	r Register
 }
 
 func NewDB(opts ...DBOption) (*DB, error) {
 	db := &DB{
-		r: &register{},
+		r: NewRegister(),
 	}
 	for _, opt := range opts {
 		opt(db)
