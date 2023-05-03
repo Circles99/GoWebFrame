@@ -11,7 +11,7 @@ const (
 
 type Model struct {
 	tableName string
-	fields    map[string]*Field
+	FieldMap  map[string]*Field
 	ColumnMap map[string]*Field
 }
 

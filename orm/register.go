@@ -107,7 +107,8 @@ func (r *register) parseModel(entity any) (*Model, error) {
 
 	return &Model{
 		tableName: tableName,
-		fields:    fieldMap,
+		FieldMap:  fieldMap,
+		ColumnMap: columnMap,
 	}, nil
 
 }

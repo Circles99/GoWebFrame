@@ -2,7 +2,10 @@ package orm
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -98,33 +101,56 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 		return nil, err
 	}
 
+	if !rows.Next() {
+		return nil, sql.ErrNoRows
+	}
+
 	// 获取读到的所有列
 	cs, err := rows.Columns()
 	if err != nil {
 		return nil, err
 	}
 
-	//m, err := s.db.r.Get()
+	tp := new(T)
+	vals := make([]any, 0, len(cs))
+	valElems := make([]reflect.Value, 0, len(cs))
 
-	vals := make([]any, 0)
-
+	// 这一步相当于准备箱子
 	for _, c := range cs {
-		for fieldName, _ := range s.model.fields {
-			// 字段名
-			if c == fieldName {
-				vals = append(vals, c)
-			}
+		fd, ok := s.model.ColumnMap[c]
+		if !ok {
+			return nil, errors.New("找不到此字段")
 		}
+		// 反射创建一个实例
+		//这里创建的实例要是原本类型的指针
+		//离谱 fd.type = int 那么val = *int
+		val := reflect.New(fd.Typ)
+		vals = append(vals, val.Interface())
+		//要调用ele。 因为fd.type = int, val是*int
+		valElems = append(valElems, val.Elem())
 	}
 
-	for rows.Next() {
-		err = rows.Scan(vals...)
-		if err != nil {
-			return nil, err
+	// 类型要匹配
+	// 顺序要匹配
+	err = rows.Scan(vals...)
+	if err != nil {
+		return nil, err
+	}
+
+	// 赋值进model中
+	tpValueElem := reflect.ValueOf(tp).Elem()
+	// 这一步相当于把箱子搬到对应位置
+	for i, c := range cs {
+		fd, ok := s.model.ColumnMap[c]
+		if !ok {
+			return nil, errors.New("找不到此字段")
 		}
+		// 都使用指针
+		tpValueElem.FieldByName(fd.goName).Set(valElems[i])
 
 	}
-	return nil, nil
+
+	return tp, err
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
@@ -167,7 +193,7 @@ func (s *Selector[T]) buildExpression(e Expression) error {
 		}
 
 	case Column:
-		fd, ok := s.model.fields[expr.name]
+		fd, ok := s.model.FieldMap[expr.name]
 		if !ok {
 			return fmt.Errorf("位置字段： %v", expr.name)
 		}

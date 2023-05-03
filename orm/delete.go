@@ -114,7 +114,7 @@ func (d *Deleter[T]) buildExpression(e Expression) error {
 			d.sb.WriteByte(')')
 		}
 	case Column:
-		m, ok := d.model.fields[expr.name]
+		m, ok := d.model.FieldMap[expr.name]
 		if !ok {
 			return errors.New("找不到此字段")
 		}
