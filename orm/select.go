@@ -116,7 +116,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	valElems := make([]reflect.Value, 0, len(cs))
 
 	// 这一步相当于准备箱子
-	for _, c := range cs {
+	for i, c := range cs {
 		fd, ok := s.model.ColumnMap[c]
 		if !ok {
 			return nil, errors.New("找不到此字段")
@@ -125,9 +125,9 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 		//这里创建的实例要是原本类型的指针
 		//离谱 fd.type = int 那么val = *int
 		val := reflect.New(fd.Typ)
-		vals = append(vals, val.Interface())
+		vals[i] = val.Interface()
 		//要调用ele。 因为fd.type = int, val是*int
-		valElems = append(valElems, val.Elem())
+		valElems[i] = val.Elem()
 	}
 
 	// 类型要匹配
