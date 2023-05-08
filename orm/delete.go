@@ -1,6 +1,7 @@
 package orm
 
 import (
+	model2 "GoWebFrame/orm/interal/model"
 	"context"
 	"errors"
 	"fmt"
@@ -11,7 +12,7 @@ type Deleter[T any] struct {
 	sb        *strings.Builder
 	tableName string
 	db        *DB
-	model     *Model
+	model     *model2.Model
 	where     []Predicate
 	agrs      []any
 }
@@ -47,7 +48,7 @@ func (d *Deleter[T]) Build() (*Query, error) {
 
 	if d.tableName == "" {
 		d.sb.WriteString("`")
-		d.sb.WriteString(d.model.tableName)
+		d.sb.WriteString(d.model.TableName)
 		d.sb.WriteString("`")
 	} else {
 		d.sb.WriteString(d.tableName)
@@ -120,7 +121,7 @@ func (d *Deleter[T]) buildExpression(e Expression) error {
 		}
 
 		d.sb.WriteByte('`')
-		d.sb.WriteString(m.colName)
+		d.sb.WriteString(m.ColName)
 		d.sb.WriteByte('`')
 
 	case Value:

@@ -1,4 +1,4 @@
-package orm
+package model
 
 import (
 	"reflect"
@@ -10,7 +10,7 @@ const (
 )
 
 type Model struct {
-	tableName string
+	TableName string
 	FieldMap  map[string]*Field
 	ColumnMap map[string]*Field
 }
@@ -23,16 +23,16 @@ type TableName interface {
 
 type Field struct {
 	// 列名
-	colName string
+	ColName string
 	// 代码结构体名
-	goName string
+	GoName string
 	// 类型
 	Typ reflect.Type
 	// 偏移量
-	offset uintptr
+	Offset uintptr
 }
 
-type ModelOpt func(model *Model) error
+type Options func(model *Model) error
 
 func underscoreName(tableName string) string {
 	var buf []byte

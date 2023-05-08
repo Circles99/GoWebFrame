@@ -1,19 +1,16 @@
 package orm
 
 import (
+	model2 "GoWebFrame/orm/interal/model"
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
-	"reflect"
 	"strings"
-	"unsafe"
 )
 
 type Selector[T any] struct {
 	sb    *strings.Builder // sb在指针中也会引起复制，所以需要获取指针
 	tbl   string
-	model *Model
+	model *model2.Model
 	where []Predicate
 	args  []any
 	db    *DB
@@ -64,7 +61,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 		// 获取名字
 		s.sb.WriteString("`")
 		//s.sb.WriteString(typ.Name())
-		s.sb.WriteString(s.model.tableName)
+		s.sb.WriteString(s.model.TableName)
 		s.sb.WriteString("`")
 	} else {
 		s.sb.WriteString(s.tbl)
@@ -102,102 +99,11 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 		return nil, err
 	}
 
-	if !rows.Next() {
-		return nil, sql.ErrNoRows
-	}
-
-	// 获取读到的所有列
-	cs, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-
-	tp := new(T)
-	vals := make([]any, 0, len(cs))
-	valElems := make([]reflect.Value, 0, len(cs))
-
-	// 这一步相当于准备箱子
-	for i, c := range cs {
-		fd, ok := s.model.ColumnMap[c]
-		if !ok {
-			return nil, errors.New("找不到此字段")
-		}
-		// 反射创建一个实例
-		//这里创建的实例要是原本类型的指针
-		//离谱 fd.type = int 那么val = *int
-		val := reflect.New(fd.Typ)
-		vals[i] = val.Interface()
-		//要调用ele。 因为fd.type = int, val是*int
-		valElems[i] = val.Elem()
-	}
-
-	// 类型要匹配
-	// 顺序要匹配
-	err = rows.Scan(vals...)
-	if err != nil {
-		return nil, err
-	}
-
-	// 赋值进model中
-	tpValueElem := reflect.ValueOf(tp).Elem()
-	// 这一步相当于把箱子搬到对应位置
-	for i, c := range cs {
-		fd, ok := s.model.ColumnMap[c]
-		if !ok {
-			return nil, errors.New("找不到此字段")
-		}
-		// 都使用指针进行赋值
-		tpValueElem.FieldByName(fd.goName).Set(valElems[i])
-
-	}
-
-	return tp, err
-}
-
-func (s *Selector[T]) GetUnsafe(ctx context.Context) (*T, error) {
-	query, err := s.Build()
-	if err != nil {
-		return nil, err
-	}
-	// 获取数据
-	rows, err := s.db.db.QueryContext(ctx, query.SQL, query.Args)
-	if err != nil {
-		return nil, err
-	}
-
-	if !rows.Next() {
-		return nil, sql.ErrNoRows
-	}
-
-	// 获取读到的所有列
-	cs, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
 	t := new(T)
-	vals := make([]any, 0, len(cs))
-	// 获取地址, unsafe.Pointer 和  uintptr的区别，   unsafe.Pointer： go会在GC之后维护，而uintptr不会
-	addr := unsafe.Pointer(reflect.ValueOf(t).Pointer())
+	val := s.db.ValCreator(t, s.model)
+	// 在这里灵活切换反射或者 unsafe
 
-	for i, c := range cs {
-		fd, ok := s.model.ColumnMap[c]
-		if !ok {
-			return nil, errors.New("找不到此字段")
-		}
-		// 反射创建一个实例
-		//这里创建的实例要是原本类型的指针
-		//离谱 fd.type = int 那么val = *int
-		// 这段相当于获取到每个字段的类型以及内存地址
-		vals[i] = reflect.NewAt(fd.Typ, unsafe.Pointer(uintptr(addr)+fd.offset))
-	}
-	// 直接赋值
-	err = rows.Scan(vals...)
-	if err != nil {
-		return nil, err
-	}
-
-	return t, nil
-
+	return t, val.SetColumns(rows)
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
@@ -245,7 +151,7 @@ func (s *Selector[T]) buildExpression(e Expression) error {
 			return fmt.Errorf("位置字段： %v", expr.name)
 		}
 		s.sb.WriteByte('`')
-		s.sb.WriteString(fd.colName)
+		s.sb.WriteString(fd.ColName)
 		s.sb.WriteByte('`')
 	case Value:
 		s.sb.WriteByte('?')

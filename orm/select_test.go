@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"reflect"
 	"testing"
 )
 
@@ -84,6 +85,23 @@ func TestSelector_build(t *testing.T) {
 			assert.Equal(t, tc.wantQuery, query)
 		})
 	}
+}
+
+func TestAA(T *testing.T) {
+	a := &TestModel{}
+	typ := reflect.TypeOf(a).Elem()
+
+	for i := 0; i < typ.NumField(); i++ {
+		fd := typ.Field(i)
+		v := reflect.New(fd.Type)
+		fmt.Println("V", v)
+		fmt.Println("fd.Type", fd.Type)
+		fmt.Printf("interface, %v", v.Kind())
+		fmt.Println()
+		fmt.Printf("elem, %v", v.Elem().Kind())
+		fmt.Println()
+	}
+
 }
 
 type TestModel struct {

@@ -1,4 +1,4 @@
-package orm
+package model
 
 import (
 	"GoWebFrame/orm/errs"
@@ -12,7 +12,7 @@ type Register interface {
 	// Get 查询元数据
 	Get(val any) (*Model, error)
 	// Register 注册一个模型
-	Register(val any, opts ...ModelOpt) (*Model, error)
+	Register(val any, opts ...Options) (*Model, error)
 }
 
 type register struct {
@@ -33,7 +33,7 @@ func (r *register) Get(val any) (*Model, error) {
 	return r.Register(val)
 }
 
-func (r *register) Register(val any, opts ...ModelOpt) (*Model, error) {
+func (r *register) Register(val any, opts ...Options) (*Model, error) {
 
 	// 解析model进行注册
 	m, err := r.parseModel(val)
@@ -83,10 +83,10 @@ func (r *register) parseModel(entity any) (*Model, error) {
 		}
 
 		meta := &Field{
-			colName: colName,
-			goName:  fd.Name,
+			ColName: colName,
+			GoName:  fd.Name,
 			Typ:     fd.Type,
-			offset:  fd.Offset, // 获取偏移量
+			Offset:  fd.Offset, // 获取偏移量
 		}
 
 		// golang中字段map
@@ -106,7 +106,7 @@ func (r *register) parseModel(entity any) (*Model, error) {
 	}
 
 	return &Model{
-		tableName: tableName,
+		TableName: tableName,
 		FieldMap:  fieldMap,
 		ColumnMap: columnMap,
 	}, nil
