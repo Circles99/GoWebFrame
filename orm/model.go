@@ -28,6 +28,8 @@ type Field struct {
 	goName string
 	// 类型
 	Typ reflect.Type
+	// 偏移量
+	offset uintptr
 }
 
 type ModelOpt func(model *Model) error

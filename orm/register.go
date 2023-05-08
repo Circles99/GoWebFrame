@@ -81,19 +81,19 @@ func (r *register) parseModel(entity any) (*Model, error) {
 		if colName == "" {
 			colName = underscoreName(fd.Name)
 		}
-		// golang中字段map
-		fieldMap[fd.Name] = &Field{
+
+		meta := &Field{
 			colName: colName,
 			goName:  fd.Name,
 			Typ:     fd.Type,
+			offset:  fd.Offset, // 获取偏移量
 		}
 
+		// golang中字段map
+		fieldMap[fd.Name] = meta
+
 		// 数据库字段映射字段
-		columnMap[colName] = &Field{
-			colName: colName,
-			goName:  fd.Name,
-			Typ:     fd.Type,
-		}
+		columnMap[colName] = meta
 	}
 
 	// 判断是否实现了此方法
