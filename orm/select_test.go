@@ -104,6 +104,14 @@ func TestAA(T *testing.T) {
 
 }
 
+func memoryDB(t *testing.T) *DB {
+	orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return orm
+}
+
 type TestModel struct {
 	Id        int64
 	FirstName string
