@@ -1,16 +1,13 @@
 package orm
 
 import (
-	"GoWebFrame/orm/interal/model"
 	"context"
 	"fmt"
-	"strings"
 )
 
 type Selector[T any] struct {
-	sb      *strings.Builder // sb在指针中也会引起复制，所以需要获取指针
+	builder
 	tbl     string
-	model   *model.Model
 	where   []Predicate
 	columns []selectedAlias
 	args    []any
@@ -53,7 +50,6 @@ func (s *Selector[T]) Build() (*Query, error) {
 		err error
 	)
 
-	s.sb = &strings.Builder{}
 	s.model, err = s.db.r.Get(&t)
 	if err != nil {
 		return nil, err
@@ -62,57 +58,24 @@ func (s *Selector[T]) Build() (*Query, error) {
 	s.sb.WriteString("SELECT ")
 
 	// 进行拼接
-	if len(s.columns) > 0 {
-		for i, c := range s.columns {
-			if i > 0 {
-				s.sb.WriteByte(',')
-			}
-			switch val := c.(type) {
-			case Column:
-				err = s.buildColumn(val)
-				if err != nil {
-					return nil, err
-				}
-			case Aggregate:
-				if err = s.buildAggregate(val); err != nil {
-					return nil, err
-				}
-			case RawExpr:
-				s.sb.WriteString(val.raw)
-				if len(val.args) > 0 {
-					s.args = append(s.args, val.args...)
-				}
-			}
-		}
-	} else {
-		s.sb.WriteByte('*')
+	if err = s.buildColumns(); err != nil {
+		return nil, err
 	}
 
 	s.sb.WriteString(" FROM ")
-
 	if s.tbl == "" {
 		//var t T
 		//// 获取类型
 		//typ := reflect.TypeOf(t)
 		// 获取名字
-		s.sb.WriteString("`")
-		//s.sb.WriteString(typ.Name ())
-		s.sb.WriteString(s.model.TableName)
-		s.sb.WriteString("`")
+		s.quote(s.model.TableName)
 	} else {
 		s.sb.WriteString(s.tbl)
 	}
 
 	if len(s.where) > 0 {
 		s.sb.WriteString(" WHERE ")
-		// 拿出第0个, 下面循环从1开始，进行and, 二叉树
-		p := s.where[0]
-		for i := 1; i < len(s.where); i++ {
-			// 每次返回一个新的predicate,重新赋值
-			p = p.And(s.where[1])
-		}
-		err := s.buildExpression(p)
-		if err != nil {
+		if err = s.buildPredicates(s.where); err != nil {
 			return nil, err
 		}
 	}
@@ -145,75 +108,6 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	//TODO implement me
 	panic("implement me")
-}
-
-// buildExpression
-// Expression 是从 sql where 中获取的字段， model中的field 从 struct中获取
-func (s *Selector[T]) buildExpression(e Expression) error {
-	switch expr := e.(type) {
-	case nil:
-		return nil
-	case Predicate:
-		// 进行左右两边递归调用拼接值
-		_, ok := expr.left.(Predicate)
-		if ok {
-			s.sb.WriteByte('(')
-		}
-		if err := s.buildExpression(expr.left); err != nil {
-			return err
-		}
-		if ok {
-			s.sb.WriteByte(')')
-		}
-
-		if expr.op == "" {
-			return nil
-		}
-
-		// 拼接中间
-		s.sb.WriteByte(' ')
-		s.sb.WriteString(expr.op.String())
-		s.sb.WriteByte(' ')
-
-		_, ok = expr.right.(Predicate)
-		if ok {
-			s.sb.WriteByte('(')
-		}
-		if err := s.buildExpression(expr.right); err != nil {
-			return err
-		}
-		if ok {
-			s.sb.WriteByte(')')
-		}
-
-	case Column:
-		fd, ok := s.model.FieldMap[expr.name]
-		if !ok {
-			return fmt.Errorf("位置字段： %v", expr.name)
-		}
-		s.sb.WriteByte('`')
-		s.sb.WriteString(fd.ColName)
-		s.sb.WriteByte('`')
-	case Value:
-		s.sb.WriteByte('?')
-		if s.args == nil {
-			s.args = make([]any, 0)
-		}
-		s.args = append(s.args, expr.val)
-	case Aggregate:
-		if err := s.buildAggregate(expr); err != nil {
-			return err
-		}
-	case RawExpr:
-		s.sb.WriteString(expr.raw)
-		if len(expr.args) > 0 {
-			s.args = append(s.args, expr.args...)
-		}
-
-	default:
-		return fmt.Errorf("不支持此表达式")
-	}
-	return nil
 }
 
 func (s *Selector[T]) buildColumn(c Column) error {
@@ -253,4 +147,35 @@ func (s *Selector[T]) buildAggregate(a Aggregate) error {
 		s.buildAlias(a.alias)
 	}
 	return nil
+}
+
+func (s *Selector[T]) buildColumns() error {
+
+	if len(s.columns) == 0 {
+		s.sb.WriteByte('*')
+		return nil
+	}
+	for i, c := range s.columns {
+		if i > 0 {
+			s.sb.WriteByte(',')
+		}
+		switch val := c.(type) {
+		case Column:
+			err := s.buildColumn(val)
+			if err != nil {
+				return err
+			}
+		case Aggregate:
+			if err := s.buildAggregate(val); err != nil {
+				return err
+			}
+		case RawExpr:
+			s.sb.WriteString(val.raw)
+			if len(val.args) > 0 {
+				s.args = append(s.args, val.args...)
+			}
+		}
+	}
+	return nil
+
 }

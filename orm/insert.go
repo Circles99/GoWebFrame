@@ -4,7 +4,6 @@ import (
 	"GoWebFrame/orm/errs"
 	"GoWebFrame/orm/interal/model"
 	"reflect"
-	"strings"
 )
 
 type OnDuplicateBuilder[T any] struct {
@@ -22,7 +21,7 @@ func (o *OnDuplicateBuilder[T]) Update(assigns ...Assignable) *Inserter[T] {
 }
 
 type Inserter[T any] struct {
-	sb strings.Builder
+	builder
 	// 字段
 	columns []string
 	// 赋值
@@ -36,11 +35,10 @@ type Inserter[T any] struct {
 func NewInserter[T any](db *DB) *Inserter[T] {
 	return &Inserter[T]{
 		db: db,
-		sb: strings.Builder{},
-		//builder: builder{
-		//	dialect: db.dialect,
-		//	quoter:  db.dialect.quoter(),
-		//},
+		builder: builder{
+			dialect: db.dialect,
+			quoter:  db.dialect.quoter(),
+		},
 	}
 }
 
@@ -72,9 +70,7 @@ func (i Inserter[T]) Build() (*Query, error) {
 	}
 	// 拼接sql
 	i.sb.WriteString("INSERT INTO ")
-	i.sb.WriteByte('`')
-	i.sb.WriteString(m.TableName)
-	i.sb.WriteByte('`')
+	i.quote(i.model.TableName)
 	i.sb.WriteString("(")
 	// 对比字段值和传进来的值
 	fields := m.Fields
@@ -94,9 +90,7 @@ func (i Inserter[T]) Build() (*Query, error) {
 		if idx > 0 {
 			i.sb.WriteByte(',')
 		}
-		i.sb.WriteByte('`')
-		i.sb.WriteString(field.ColName)
-		i.sb.WriteByte('`')
+		i.quote(field.ColName)
 	}
 	i.sb.WriteString(") VALUES")
 
@@ -123,37 +117,7 @@ func (i Inserter[T]) Build() (*Query, error) {
 	}
 
 	if len(i.onDuplicate.assigns) > 0 {
-		i.sb.WriteString(" ON DUPLICATE KEY UPDATE ")
-		for idx, assign := range i.onDuplicate.assigns {
-			if idx > 0 {
-				i.sb.WriteByte(',')
-			}
-			switch a := assign.(type) {
-			case Assignment:
-				i.sb.WriteByte('`')
-				fd, ok := m.FieldMap[a.column]
-				if !ok {
-					return nil, errs.NewErrUnknownField(a.column)
-				}
-				i.sb.WriteString(fd.ColName)
-				i.sb.WriteByte('`')
-				i.sb.WriteString("=?")
-				i.args = append(i.args, a.val)
-			case Column:
-				i.sb.WriteByte('`')
-				fd, ok := m.FieldMap[a.name]
-				if !ok {
-					return nil, errs.NewErrUnknownField(a.name)
-				}
-				i.sb.WriteString(fd.ColName)
-				i.sb.WriteByte('`')
-				i.sb.WriteString("=VALUES(`")
-				i.sb.WriteString(fd.ColName)
-				i.sb.WriteString("`)")
-			default:
-				return nil, errs.NewErrUnsupportedAssignableType(a)
-			}
-		}
+		i.dialect.buildUpsert(&i.builder, i.onDuplicate)
 	}
 
 	i.sb.WriteByte(';')

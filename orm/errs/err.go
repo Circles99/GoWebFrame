@@ -20,3 +20,7 @@ func NewErrUnknownField(val string) error {
 func NewErrUnsupportedAssignableType(exp any) error {
 	return fmt.Errorf("orm: 不支持的 Assignable 表达式 %v", exp)
 }
+
+func NewErrUnsupportedExpressionType(exp any) error {
+	return fmt.Errorf("orm: 不支持的 expression 表达式 %v", exp)
+}

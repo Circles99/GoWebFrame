@@ -12,6 +12,7 @@ type DB struct {
 	r          model.Register
 	ValCreator valuer.Creator
 	db         *sql.DB
+	dialect    Dialect
 }
 
 func Open(driver string, dsn string, opts ...DBOption) (*DB, error) {
@@ -31,6 +32,7 @@ func OpenDB(db *sql.DB, opts ...DBOption) (*DB, error) {
 		r:          model.NewRegister(),
 		db:         db,
 		ValCreator: valuer.NewUnsafeValues,
+		dialect:    MysqlDialect{},
 	}
 	for _, opt := range opts {
 		opt(res)
@@ -42,6 +44,7 @@ func NewDB(opts ...DBOption) (*DB, error) {
 	db := &DB{
 		r:          model.NewRegister(),
 		ValCreator: valuer.NewUnsafeValues,
+		dialect:    MysqlDialect{},
 	}
 	for _, opt := range opts {
 		opt(db)
