@@ -7,6 +7,20 @@ import (
 	"strings"
 )
 
+type OnDuplicateBuilder[T any] struct {
+	i *Inserter[T]
+}
+
+type OnDuplicateKey struct {
+	assigns []Assignable
+}
+
+func (o *OnDuplicateBuilder[T]) Update(assigns ...Assignable) *Inserter[T] {
+	o.i.onDuplicate = &OnDuplicateKey{assigns: assigns}
+
+	return o.i
+}
+
 type Inserter[T any] struct {
 	sb strings.Builder
 	// 字段
@@ -15,6 +29,8 @@ type Inserter[T any] struct {
 	values []*T
 	db     *DB
 	args   []any
+	// 方案二
+	onDuplicate *OnDuplicateKey
 }
 
 func NewInserter[T any](db *DB) *Inserter[T] {
@@ -36,6 +52,12 @@ func (i *Inserter[T]) Columns(cols ...string) *Inserter[T] {
 func (i *Inserter[T]) Values(vals ...*T) *Inserter[T] {
 	i.values = vals
 	return i
+}
+
+func (i *Inserter[T]) OnDuplicateKey() *OnDuplicateBuilder[T] {
+	return &OnDuplicateBuilder[T]{
+		i: i,
+	}
 }
 
 func (i Inserter[T]) Build() (*Query, error) {
@@ -98,6 +120,40 @@ func (i Inserter[T]) Build() (*Query, error) {
 			i.args = append(i.args, fdVal.Interface())
 		}
 		i.sb.WriteByte(')')
+	}
+
+	if len(i.onDuplicate.assigns) > 0 {
+		i.sb.WriteString(" ON DUPLICATE KEY UPDATE ")
+		for idx, assign := range i.onDuplicate.assigns {
+			if idx > 0 {
+				i.sb.WriteByte(',')
+			}
+			switch a := assign.(type) {
+			case Assignment:
+				i.sb.WriteByte('`')
+				fd, ok := m.FieldMap[a.column]
+				if !ok {
+					return nil, errs.NewErrUnknownField(a.column)
+				}
+				i.sb.WriteString(fd.ColName)
+				i.sb.WriteByte('`')
+				i.sb.WriteString("=?")
+				i.args = append(i.args, a.val)
+			case Column:
+				i.sb.WriteByte('`')
+				fd, ok := m.FieldMap[a.name]
+				if !ok {
+					return nil, errs.NewErrUnknownField(a.name)
+				}
+				i.sb.WriteString(fd.ColName)
+				i.sb.WriteByte('`')
+				i.sb.WriteString("=VALUES(`")
+				i.sb.WriteString(fd.ColName)
+				i.sb.WriteString("`)")
+			default:
+				return nil, errs.NewErrUnsupportedAssignableType(a)
+			}
+		}
 	}
 
 	i.sb.WriteByte(';')

@@ -84,57 +84,57 @@ func TestInserter_Build(t *testing.T) {
 			wantErr: errs.NewErrUnknownField("Invalid"),
 		},
 
-		//{
-		//	// upsert
-		//	name: "upsert",
-		//	q: NewInserter[TestModel](db).Values(
-		//		&TestModel{
-		//			Id:        1,
-		//			FirstName: "Deng",
-		//			Age:       18,
-		//			LastName:  &sql.NullString{String: "Ming", Valid: true},
-		//		}).OnDuplicateKey().Update(Assign("FirstName", "Da")),
-		//	wantQuery: &Query{
-		//		SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?) " +
-		//			"ON DUPLICATE KEY UPDATE `first_name`=?;",
-		//		Args: []any{int64(1), "Deng", int8(18), &sql.NullString{String: "Ming", Valid: true}, "Da"},
-		//	},
-		//},
-		//{
-		//	// upsert invalid column
-		//	name: "upsert invalid column",
-		//	q: NewInserter[TestModel](db).Values(
-		//		&TestModel{
-		//			Id:        1,
-		//			FirstName: "Deng",
-		//			Age:       18,
-		//			LastName:  &sql.NullString{String: "Ming", Valid: true},
-		//		}).OnDuplicateKey().Update(Assign("Invalid", "Da")),
-		//	wantErr: errs.NewErrUnknownField("Invalid"),
-		//},
-		//{
-		//	// 使用原本插入的值
-		//	name: "upsert use insert value",
-		//	q: NewInserter[TestModel](db).Values(
-		//		&TestModel{
-		//			Id:        1,
-		//			FirstName: "Deng",
-		//			Age:       18,
-		//			LastName:  &sql.NullString{String: "Ming", Valid: true},
-		//		},
-		//		&TestModel{
-		//			Id:        2,
-		//			FirstName: "Da",
-		//			Age:       19,
-		//			LastName:  &sql.NullString{String: "Ming", Valid: true},
-		//		}).OnDuplicateKey().Update(C("FirstName"), C("LastName")),
-		//	wantQuery: &Query{
-		//		SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?),(?,?,?,?) " +
-		//			"ON DUPLICATE KEY UPDATE `first_name`=VALUES(`first_name`),`last_name`=VALUES(`last_name`);",
-		//		Args: []any{int64(1), "Deng", int8(18), &sql.NullString{String: "Ming", Valid: true},
-		//			int64(2), "Da", int8(19), &sql.NullString{String: "Ming", Valid: true}},
-		//	},
-		//},
+		{
+			// upsert
+			name: "upsert",
+			q: NewInserter[TestModel](db).Values(
+				&TestModel{
+					Id:        1,
+					FirstName: "Deng",
+					Age:       18,
+					LastName:  &sql.NullString{String: "Ming", Valid: true},
+				}).OnDuplicateKey().Update(Assign("FirstName", "Da")),
+			wantQuery: &Query{
+				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?) " +
+					"ON DUPLICATE KEY UPDATE `first_name`=?;",
+				Args: []any{int64(1), "Deng", int8(18), &sql.NullString{String: "Ming", Valid: true}, "Da"},
+			},
+		},
+		{
+			// upsert invalid column
+			name: "upsert invalid column",
+			q: NewInserter[TestModel](db).Values(
+				&TestModel{
+					Id:        1,
+					FirstName: "Deng",
+					Age:       18,
+					LastName:  &sql.NullString{String: "Ming", Valid: true},
+				}).OnDuplicateKey().Update(Assign("Invalid", "Da")),
+			wantErr: errs.NewErrUnknownField("Invalid"),
+		},
+		{
+			// 使用原本插入的值
+			name: "upsert use insert value",
+			q: NewInserter[TestModel](db).Values(
+				&TestModel{
+					Id:        1,
+					FirstName: "Deng",
+					Age:       18,
+					LastName:  &sql.NullString{String: "Ming", Valid: true},
+				},
+				&TestModel{
+					Id:        2,
+					FirstName: "Da",
+					Age:       19,
+					LastName:  &sql.NullString{String: "Ming", Valid: true},
+				}).OnDuplicateKey().Update(C("FirstName"), C("LastName")),
+			wantQuery: &Query{
+				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?),(?,?,?,?) " +
+					"ON DUPLICATE KEY UPDATE `first_name`=VALUES(`first_name`),`last_name`=VALUES(`last_name`);",
+				Args: []any{int64(1), "Deng", int8(18), &sql.NullString{String: "Ming", Valid: true},
+					int64(2), "Da", int8(19), &sql.NullString{String: "Ming", Valid: true}},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

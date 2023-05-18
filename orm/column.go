@@ -11,6 +11,8 @@ func (Column) expr() {}
 // 标记接口
 func (Column) selectable() {}
 
+func (Column) assign() {}
+
 // As 设置别名
 func (c Column) As(alias string) Column {
 	return Column{
