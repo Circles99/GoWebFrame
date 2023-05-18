@@ -67,6 +67,7 @@ func (r *register) parseModel(entity any) (*Model, error) {
 
 	numField := typ.NumField()
 	fieldMap := make(map[string]*Field, numField)
+	fields := make([]*Field, numField)
 	columnMap := make(map[string]*Field, numField)
 	for i := 0; i < numField; i++ {
 		fd := typ.Field(i)
@@ -87,11 +88,12 @@ func (r *register) parseModel(entity any) (*Model, error) {
 			GoName:  fd.Name,
 			Typ:     fd.Type,
 			Offset:  fd.Offset, // 获取偏移量
+			Index:   i,
 		}
 
 		// golang中字段map
 		fieldMap[fd.Name] = meta
-
+		fields[i] = meta
 		// 数据库字段映射字段
 		columnMap[colName] = meta
 	}
@@ -108,6 +110,7 @@ func (r *register) parseModel(entity any) (*Model, error) {
 	return &Model{
 		TableName: tableName,
 		FieldMap:  fieldMap,
+		Fields:    fields,
 		ColumnMap: columnMap,
 	}, nil
 

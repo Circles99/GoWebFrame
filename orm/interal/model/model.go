@@ -12,6 +12,7 @@ const (
 type Model struct {
 	TableName string
 	FieldMap  map[string]*Field
+	Fields    []*Field
 	ColumnMap map[string]*Field
 }
 
@@ -30,6 +31,7 @@ type Field struct {
 	Typ reflect.Type
 	// 偏移量
 	Offset uintptr
+	Index  int
 }
 
 type Options func(model *Model) error
