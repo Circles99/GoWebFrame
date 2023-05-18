@@ -16,6 +16,10 @@ func (o op) String() string {
 	return string(o)
 }
 
+type Expression interface {
+	expr()
+}
+
 // 接受结构化的Predicate进行输入
 
 type Predicate struct {
@@ -27,44 +31,12 @@ type Predicate struct {
 // 标记接口
 func (p Predicate) expr() {}
 
-type Column struct {
-	name string
-}
-
-// 标记接口
-func (Column) expr() {}
-
-type Value struct {
-	val any
-}
-
-func (Value) expr() {}
-
-func C(name string) Column {
-	return Column{name: name}
-}
-
-func (c Column) Eq(value any) Predicate {
-	return Predicate{
-		left:  c,
-		op:    opEQ,
-		right: Value{val: value},
-	}
-}
-
-func (c Column) GT(val any) Predicate {
-	return Predicate{
-		left:  c,
-		op:    opGT,
-		right: Value{val: val},
-	}
-}
-
-func (c Column) LT(val any) Predicate {
-	return Predicate{
-		left:  c,
-		op:    opLT,
-		right: Value{val: val},
+func exprOf(e any) Expression {
+	switch val := e.(type) {
+	case Expression:
+		return val
+	default:
+		return Value{val: val}
 	}
 }
 

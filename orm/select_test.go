@@ -72,6 +72,64 @@ func TestSelector_build(t *testing.T) {
 			},
 			wantErr: nil,
 		},
+
+		{
+			name: "select",
+			q:    NewSelector[TestModel](db).Select(C("Id")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			wantQuery: &Query{
+				SQL:  "SELECT `id` FROM `TestModel` WHERE  NOT (`id` = ?);",
+				Args: []any{2},
+			},
+			wantErr: nil,
+		},
+
+		{
+			name: "select alias",
+			q:    NewSelector[TestModel](db).Select(C("Id").As("aliasId")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			wantQuery: &Query{
+				SQL:  "SELECT `id` AS `aliasId` FROM `TestModel` WHERE  NOT (`id` = ?);",
+				Args: []any{2},
+			},
+			wantErr: nil,
+		},
+
+		{
+			name: "select aggregate",
+			q:    NewSelector[TestModel](db).Select(Count("Id")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			wantQuery: &Query{
+				SQL:  "SELECT COUNT(`id`) FROM `TestModel` WHERE  NOT (`id` = ?);",
+				Args: []any{2},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "select aggregate as",
+			q:    NewSelector[TestModel](db).Select(Count("Id").AS("aliasId")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			wantQuery: &Query{
+				SQL:  "SELECT COUNT(`id`) AS `aliasId` FROM `TestModel` WHERE  NOT (`id` = ?);",
+				Args: []any{2},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "select aggregate as and where",
+			q:    NewSelector[TestModel](db).Select(Count("Id").AS("aliasId")).From("`TestModel`").Where(Avg("Id").EQ(2)),
+			wantQuery: &Query{
+				SQL:  "SELECT COUNT(`id`) AS `aliasId` FROM `TestModel` WHERE AVG(`id`) = ?;",
+				Args: []any{2},
+			},
+			wantErr: nil,
+		},
+		{
+			// 使用 RawExpr
+			name: "raw expression",
+			q: NewSelector[TestModel](db).Select(Raw("`id`")).
+				Where(Raw("`age` < ?", 18).AsPredicate()),
+			wantQuery: &Query{
+				SQL:  "SELECT `id` FROM `test_model` WHERE `age` < ?;",
+				Args: []any{18},
+			},
+		},
 	}
 
 	for _, tc := range testCase {

@@ -1,19 +1,20 @@
 package orm
 
 import (
-	model2 "GoWebFrame/orm/interal/model"
+	"GoWebFrame/orm/interal/model"
 	"context"
 	"fmt"
 	"strings"
 )
 
 type Selector[T any] struct {
-	sb    *strings.Builder // sb在指针中也会引起复制，所以需要获取指针
-	tbl   string
-	model *model2.Model
-	where []Predicate
-	args  []any
-	db    *DB
+	sb      *strings.Builder // sb在指针中也会引起复制，所以需要获取指针
+	tbl     string
+	model   *model.Model
+	where   []Predicate
+	columns []selectedAlias
+	args    []any
+	db      *DB
 }
 
 // 应该在DB上创建Selector比较合适 golang 不支持这种写法 Method cannot have type parameters
@@ -27,6 +28,12 @@ func NewSelector[T any](db *DB) *Selector[T] {
 	return &Selector[T]{
 		db: db,
 	}
+}
+
+// Select 加入需要查询的字段
+func (s *Selector[T]) Select(cols ...selectedAlias) *Selector[T] {
+	s.columns = cols
+	return s
 }
 
 // From 加入表名，为了链式调用返回Selector[T]
@@ -52,7 +59,36 @@ func (s *Selector[T]) Build() (*Query, error) {
 		return nil, err
 	}
 
-	s.sb.WriteString("SELECT * FROM ")
+	s.sb.WriteString("SELECT ")
+
+	// 进行拼接
+	if len(s.columns) > 0 {
+		for i, c := range s.columns {
+			if i > 0 {
+				s.sb.WriteByte(',')
+			}
+			switch val := c.(type) {
+			case Column:
+				err = s.buildColumn(val)
+				if err != nil {
+					return nil, err
+				}
+			case Aggregate:
+				if err = s.buildAggregate(val); err != nil {
+					return nil, err
+				}
+			case RawExpr:
+				s.sb.WriteString(val.raw)
+				if len(val.args) > 0 {
+					s.args = append(s.args, val.args...)
+				}
+			}
+		}
+	} else {
+		s.sb.WriteByte('*')
+	}
+
+	s.sb.WriteString(" FROM ")
 
 	if s.tbl == "" {
 		//var t T
@@ -60,7 +96,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 		//typ := reflect.TypeOf(t)
 		// 获取名字
 		s.sb.WriteString("`")
-		//s.sb.WriteString(typ.Name())
+		//s.sb.WriteString(typ.Name ())
 		s.sb.WriteString(s.model.TableName)
 		s.sb.WriteString("`")
 	} else {
@@ -129,6 +165,11 @@ func (s *Selector[T]) buildExpression(e Expression) error {
 		if ok {
 			s.sb.WriteByte(')')
 		}
+
+		if expr.op == "" {
+			return nil
+		}
+
 		// 拼接中间
 		s.sb.WriteByte(' ')
 		s.sb.WriteString(expr.op.String())
@@ -159,9 +200,57 @@ func (s *Selector[T]) buildExpression(e Expression) error {
 			s.args = make([]any, 0)
 		}
 		s.args = append(s.args, expr.val)
+	case Aggregate:
+		if err := s.buildAggregate(expr); err != nil {
+			return err
+		}
+	case RawExpr:
+		s.sb.WriteString(expr.raw)
+		if len(expr.args) > 0 {
+			s.args = append(s.args, expr.args...)
+		}
 
 	default:
 		return fmt.Errorf("不支持此表达式")
+	}
+	return nil
+}
+
+func (s *Selector[T]) buildColumn(c Column) error {
+	fd, ok := s.model.FieldMap[c.name]
+	if !ok {
+		return fmt.Errorf("位置字段： %v", c.name)
+	}
+	s.sb.WriteByte('`')
+	s.sb.WriteString(fd.ColName)
+	s.sb.WriteByte('`')
+
+	if c.alias != "" {
+		s.buildAlias(c.alias)
+	}
+
+	return nil
+}
+
+func (s *Selector[T]) buildAlias(alias string) {
+	s.sb.WriteString(" AS ")
+	s.sb.WriteByte('`')
+	s.sb.WriteString(alias)
+	s.sb.WriteByte('`')
+}
+
+func (s *Selector[T]) buildAggregate(a Aggregate) error {
+	s.sb.WriteString(a.fn)
+	s.sb.WriteByte('(')
+	err := s.buildColumn(Column{
+		name: a.arg,
+	})
+	if err != nil {
+		return err
+	}
+	s.sb.WriteByte(')')
+	if a.alias != "" {
+		s.buildAlias(a.alias)
 	}
 	return nil
 }
