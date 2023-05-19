@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"GoWebFrame/orm/errs"
 	"database/sql"
 	"fmt"
 	"github.com/stretchr/testify/assert"
@@ -136,6 +137,164 @@ func TestSelector_build(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			query, err := tc.q.Build()
 			fmt.Println(err)
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, query)
+		})
+	}
+}
+
+func TestSelector_OffsetLimit(t *testing.T) {
+	db, _ := NewDB()
+	testCases := []struct {
+		name      string
+		q         QueryBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			name: "offset only",
+			q:    NewSelector[TestModel](db).Offset(10),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` OFFSET ?;",
+				Args: []any{10},
+			},
+		},
+		{
+			name: "limit only",
+			q:    NewSelector[TestModel](db).Limit(10),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` LIMIT ?;",
+				Args: []any{10},
+			},
+		},
+		{
+			name: "limit offset",
+			q:    NewSelector[TestModel](db).Limit(20).Offset(10),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` LIMIT ? OFFSET ?;",
+				Args: []any{20, 10},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			query, err := tc.q.Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, query)
+		})
+	}
+}
+
+func TestSelector_Having(t *testing.T) {
+	//db := memoryDB(t)
+	db, _ := NewDB()
+	testCases := []struct {
+		name      string
+		q         QueryBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			// 调用了，但是啥也没传
+			name: "none",
+			q:    NewSelector[TestModel](db).GroupBy(C("Age")).Having(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model` GROUP BY `age`;",
+			},
+		},
+		{
+			// 单个条件
+			name: "single",
+			q: NewSelector[TestModel](db).GroupBy(C("Age")).
+				Having(C("FirstName").Eq("Deng")),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` GROUP BY `age` HAVING `first_name` = ?;",
+				Args: []any{"Deng"},
+			},
+		},
+		{
+			// 多个条件
+			name: "multiple",
+			q: NewSelector[TestModel](db).GroupBy(C("Age")).
+				Having(C("FirstName").Eq("Deng"), C("LastName").Eq("Ming")),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` GROUP BY `age` HAVING (`first_name` = ?) AND (`last_name` = ?);",
+				Args: []any{"Deng", "Ming"},
+			},
+		},
+		{
+			// 聚合函数
+			name: "avg",
+			q: NewSelector[TestModel](db).GroupBy(C("Age")).
+				Having(Avg("Age").EQ(18)),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` GROUP BY `age` HAVING AVG(`age`) = ?;",
+				Args: []any{18},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			query, err := tc.q.Build()
+			fmt.Println(query)
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, query)
+		})
+	}
+}
+
+func TestSelector_GroupBy(t *testing.T) {
+	db := memoryDB(t)
+	testCases := []struct {
+		name      string
+		q         QueryBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			// 调用了，但是啥也没传
+			name: "none",
+			q:    NewSelector[TestModel](db).GroupBy(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model`;",
+			},
+		},
+		{
+			// 单个
+			name: "single",
+			q:    NewSelector[TestModel](db).GroupBy(C("Age")),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model` GROUP BY `age`;",
+			},
+		},
+		{
+			// 多个
+			name: "multiple",
+			q:    NewSelector[TestModel](db).GroupBy(C("Age"), C("FirstName")),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model` GROUP BY `age`,`first_name`;",
+			},
+		},
+		{
+			// 不存在
+			name:    "invalid column",
+			q:       NewSelector[TestModel](db).GroupBy(C("Invalid")),
+			wantErr: errs.NewErrUnknownField("Invalid"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			query, err := tc.q.Build()
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return

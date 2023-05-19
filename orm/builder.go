@@ -78,6 +78,7 @@ func (b *builder) buildExpression(e Expression) error {
 	case Predicate:
 		// 进行左右两边递归调用拼接值
 		_, ok := exp.left.(Predicate)
+		// 当只有是Predicate类型的时候才加括号
 		if ok {
 			b.sb.WriteByte('(')
 		}

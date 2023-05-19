@@ -1,8 +1,9 @@
 package orm
 
 type Column struct {
-	name  string
-	alias string
+	name    string
+	alias   string
+	orderBy string
 }
 
 // 标记接口
@@ -18,6 +19,14 @@ func (c Column) As(alias string) Column {
 	return Column{
 		name:  c.name,
 		alias: alias,
+	}
+}
+
+// Desc 排序倒叙
+func (c Column) Desc(orderBy string) Column {
+	return Column{
+		name:    c.name,
+		orderBy: orderBy,
 	}
 }
 
