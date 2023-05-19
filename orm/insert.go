@@ -27,9 +27,11 @@ type Inserter[T any] struct {
 	// 赋值
 	values []*T
 	db     *DB
-	args   []any
-	// 方案二
+	// 此处利用OnDuplicateKey 方法调用OnDuplicateBuilder, 从OnDuplicateBuilder 调用Update 回到inserter
 	onDuplicate *OnDuplicateKey
+
+	// 也可以直接把Assignable放到这直接存入
+	//onDuplicate []Assignable
 }
 
 func NewInserter[T any](db *DB) *Inserter[T] {
@@ -69,6 +71,7 @@ func (i Inserter[T]) Build() (*Query, error) {
 		return nil, err
 	}
 	// 拼接sql
+	i.model = m
 	i.sb.WriteString("INSERT INTO ")
 	i.quote(i.model.TableName)
 	i.sb.WriteString("(")
@@ -116,8 +119,11 @@ func (i Inserter[T]) Build() (*Query, error) {
 		i.sb.WriteByte(')')
 	}
 
-	if len(i.onDuplicate.assigns) > 0 {
-		i.dialect.buildUpsert(&i.builder, i.onDuplicate)
+	if i.onDuplicate != nil {
+		if err = i.dialect.buildUpsert(&i.builder, i.onDuplicate); err != nil {
+			return nil, err
+		}
+
 	}
 
 	i.sb.WriteByte(';')
