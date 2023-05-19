@@ -73,6 +73,7 @@ func (s *Selector[T]) Having(p ...Predicate) *Selector[T] {
 	return s
 }
 
+// todo 需要支持两个表达式 暂未实现
 func (s *Selector[T]) OrderBy(cols ...Column) *Selector[T] {
 	s.orderBy = cols
 	return s
