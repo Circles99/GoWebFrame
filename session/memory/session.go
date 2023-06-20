@@ -1,7 +1,7 @@
 package memory
 
 import (
-	"GoWebFrame/session"
+	"GoWebFrame/session/intf"
 	"context"
 	"errors"
 	"github.com/patrickmn/go-cache"
@@ -27,7 +27,7 @@ func NewStore(expireTime time.Duration) *Store {
 	}
 }
 
-func (s *Store) Generate(ctx context.Context, id string) (session.Session, error) {
+func (s *Store) Generate(ctx context.Context, id string) (intf.Session, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	sess := &Session{
@@ -39,7 +39,7 @@ func (s *Store) Generate(ctx context.Context, id string) (session.Session, error
 	return sess, nil
 }
 
-func (s *Store) Get(ctx context.Context, id string) (session.Session, error) {
+func (s *Store) Get(ctx context.Context, id string) (intf.Session, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	sess, ok := s.cache.Get(id)

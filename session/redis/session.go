@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"GoWebFrame/session"
+	"GoWebFrame/session/intf"
 	"context"
 	"errors"
 	"fmt"
@@ -33,7 +33,7 @@ func NewStore(client redis.Cmdable, opts ...StoreOption) *Store {
 	return res
 }
 
-func (s *Store) Generate(ctx context.Context, id string) (session.Session, error) {
+func (s *Store) Generate(ctx context.Context, id string) (intf.Session, error) {
 	const lua = `
 redis.call("hset", KEYS[1], ARGV[1], ARGV[2])
 return redis.call("pexpire", KEYS[1], ARGV[3])
@@ -71,7 +71,7 @@ func (s *Store) Remove(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *Store) Get(ctx context.Context, id string) (session.Session, error) {
+func (s *Store) Get(ctx context.Context, id string) (intf.Session, error) {
 	key := s.key(id)
 	// 这里不需要考虑并发的问题，因为在你检测的当下，没有就是没有
 	i, err := s.client.Exists(ctx, key).Result()

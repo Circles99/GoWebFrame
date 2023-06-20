@@ -3,11 +3,11 @@ package session
 import (
 	"GoWebFrame"
 	"GoWebFrame/session/cookie"
-	"GoWebFrame/session/memory"
+	lRedis "GoWebFrame/session/redis"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"net/http"
 	"testing"
-	"time"
 )
 
 func TestManager(t *testing.T) {
@@ -21,7 +21,11 @@ func TestManager(t *testing.T) {
 
 	m := Manager{
 		SessCtxKey: "_sess",
-		Store:      memory.NewStore(30 * time.Minute),
+		Store: lRedis.NewStore(redis.NewClient(&redis.Options{
+			Addr:     "127.0.0.1:6379",
+			DB:       1,
+			Password: "",
+		})),
 		Propagator: p,
 	}
 
