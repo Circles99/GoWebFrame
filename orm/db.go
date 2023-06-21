@@ -9,10 +9,8 @@ import (
 type DBOption func(db *DB)
 
 type DB struct {
-	r          model.Register
-	ValCreator valuer.Creator
-	db         *sql.DB
-	dialect    Dialect
+	core
+	db *sql.DB
 }
 
 func Open(driver string, dsn string, opts ...DBOption) (*DB, error) {
@@ -29,10 +27,12 @@ func Open(driver string, dsn string, opts ...DBOption) (*DB, error) {
 // sqlmock.Open 的 DB
 func OpenDB(db *sql.DB, opts ...DBOption) (*DB, error) {
 	res := &DB{
-		r:          model.NewRegister(),
-		db:         db,
-		ValCreator: valuer.NewUnsafeValues,
-		dialect:    MysqlDialect{},
+		core: core{
+			r:          model.NewRegister(),
+			valCreator: valuer.NewUnsafeValues,
+			dialect:    MysqlDialect{},
+		},
+		db: db,
 	}
 	for _, opt := range opts {
 		opt(res)
@@ -42,9 +42,11 @@ func OpenDB(db *sql.DB, opts ...DBOption) (*DB, error) {
 
 func NewDB(opts ...DBOption) (*DB, error) {
 	db := &DB{
-		r:          model.NewRegister(),
-		ValCreator: valuer.NewUnsafeValues,
-		dialect:    MysqlDialect{},
+		core: core{
+			r:          model.NewRegister(),
+			valCreator: valuer.NewUnsafeValues,
+			dialect:    MysqlDialect{},
+		},
 	}
 	for _, opt := range opts {
 		opt(db)

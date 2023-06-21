@@ -4,6 +4,7 @@ package orm
 // @Description: sql函数接口
 
 type Aggregate struct {
+	table TableReference
 	fn    string // 函数
 	arg   string // 参数
 	alias string // 别名

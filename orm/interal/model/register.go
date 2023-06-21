@@ -57,7 +57,6 @@ func (r *register) Register(val any, opts ...Options) (*Model, error) {
 
 func (r *register) parseModel(entity any) (*Model, error) {
 	typ := reflect.TypeOf(entity)
-
 	// 只能传入一级指针
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Struct {
 		return nil, errors.New("只支持指向结构体的一级指针")

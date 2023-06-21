@@ -7,6 +7,7 @@ import (
 )
 
 type builder struct {
+	core
 	sb      strings.Builder
 	model   *model.Model
 	args    []any
@@ -15,13 +16,69 @@ type builder struct {
 }
 
 // buildColumn 构造列
-func (b *builder) buildColumn(fd string) error {
-	meta, ok := b.model.FieldMap[fd]
-	if !ok {
-		return errs.NewErrUnknownField(fd)
+func (b *builder) buildColumn(table TableReference, fd string) error {
+	var alias string
+
+	if table != nil {
+		alias = table.tableAlias()
 	}
-	b.quote(meta.ColName)
+	if alias != "" {
+		b.quote(alias)
+		b.sb.WriteByte('.')
+	}
+
+	colName, err := b.colName(table, fd)
+	if err != nil {
+		return err
+	}
+	b.quote(colName)
 	return nil
+}
+
+func (b *builder) colName(table TableReference, fd string) (string, error) {
+
+	switch tab := table.(type) {
+	case nil:
+		fdMeta, ok := b.model.FieldMap[fd]
+		if !ok {
+			return "", errs.NewErrUnknownField(fd)
+		}
+		return fdMeta.ColName, nil
+	case Table:
+		// join的表因为不是本身的model，需要重新找一遍获取
+		m, err := b.r.Get(tab.entity)
+
+		if err != nil {
+			return "", err
+		}
+		fdMeta, ok := m.FieldMap[fd]
+		if !ok {
+			return "", errs.NewErrUnknownField(fd)
+		}
+		return fdMeta.ColName, nil
+	case Join:
+		colName, err := b.colName(tab.left, fd)
+		if err != nil {
+			return colName, nil
+		}
+		return b.colName(tab.right, fd)
+	//case Subquery:
+	//	if len(tab.columns) > 0 {
+	//		for _, c := range tab.columns {
+	//			if c.selectedAlias() == fd {
+	//				return fd, nil
+	//			}
+	//
+	//			if c.fieldName() == fd {
+	//				return b.colName(c.target(), fd)
+	//			}
+	//		}
+	//		return "", errs.NewErrUnknownField(fd)
+	//	}
+	//	return b.colName(tab.table, fd)
+	default:
+		return "", errs.NewErrUnsupportedExpressionType(tab)
+	}
 }
 
 func (b *builder) quote(name string) {
@@ -64,10 +121,11 @@ func (b *builder) buildExpression(e Expression) error {
 	}
 	switch exp := e.(type) {
 	case Column:
-		return b.buildColumn(exp.name)
+		return b.buildColumn(exp.table, exp.name)
 	case Aggregate:
 		return b.buildAggregate(exp)
 	case Value:
+
 		b.sb.WriteByte('?')
 		b.addArgs(exp.val)
 	case RawExpr:
@@ -117,7 +175,7 @@ func (b *builder) buildExpression(e Expression) error {
 func (b *builder) buildAggregate(a Aggregate) error {
 	b.sb.WriteString(a.fn)
 	b.sb.WriteByte('(')
-	err := b.buildColumn(a.arg)
+	err := b.buildColumn(a.table, a.arg)
 	if err != nil {
 		return err
 	}

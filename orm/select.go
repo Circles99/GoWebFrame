@@ -7,7 +7,7 @@ import (
 
 type Selector[T any] struct {
 	builder
-	tbl     string
+	tbl     TableReference
 	where   []Predicate
 	columns []selectedAlias
 	db      *DB
@@ -26,10 +26,13 @@ type Selector[T any] struct {
 //}
 
 func NewSelector[T any](db *DB) *Selector[T] {
+	// 获取不同session的实例
+	//c := sess.getCore()
 	return &Selector[T]{
 		db: db,
 		// builder实例化
 		builder: builder{
+			core:    db.core,
 			dialect: db.dialect,
 			quoter:  db.dialect.quoter(),
 		},
@@ -43,7 +46,7 @@ func (s *Selector[T]) Select(cols ...selectedAlias) *Selector[T] {
 }
 
 // From 加入表名，为了链式调用返回Selector[T]
-func (s *Selector[T]) From(tbl string) *Selector[T] {
+func (s *Selector[T]) From(tbl TableReference) *Selector[T] {
 	s.tbl = tbl
 	return s
 }
@@ -92,20 +95,15 @@ func (s *Selector[T]) Build() (*Query, error) {
 
 	s.sb.WriteString("SELECT ")
 
-	// 进行拼接
+	// 字段进行拼接
 	if err = s.buildColumns(); err != nil {
 		return nil, err
 	}
 
 	s.sb.WriteString(" FROM ")
-	if s.tbl == "" {
-		//var t T
-		//// 获取类型
-		//typ := reflect.TypeOf(t)
-		// 获取名字
-		s.quote(s.model.TableName)
-	} else {
-		s.sb.WriteString(s.tbl)
+	// 表名 包括join
+	if err = s.buildTable(s.tbl); err != nil {
+		return nil, err
 	}
 
 	if len(s.where) > 0 {
@@ -158,7 +156,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	}
 
 	t := new(T)
-	val := s.db.ValCreator(t, s.model)
+	val := s.db.core.valCreator(t, s.model)
 	// 在这里灵活切换反射或者 unsafe
 
 	return t, val.SetColumns(rows)
@@ -169,41 +167,11 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	panic("implement me")
 }
 
-//func (s *Selector[T]) buildColumn(c Column) error {
-//	fd, ok := s.model.FieldMap[c.name]
-//	if !ok {
-//		return fmt.Errorf("位置字段： %v", c.name)
-//	}
-//	s.sb.WriteByte('`')
-//	s.sb.WriteString(fd.ColName)
-//	s.sb.WriteByte('`')
-//
-//	if c.alias != "" {
-//		s.buildAlias(c.alias)
-//	}
-//
-//	return nil
-//}
-
 func (s *Selector[T]) buildAlias(alias string) {
 	s.sb.WriteString(" AS ")
 	s.sb.WriteByte('`')
 	s.sb.WriteString(alias)
 	s.sb.WriteByte('`')
-}
-
-func (s *Selector[T]) buildAggregate(a Aggregate) error {
-	s.sb.WriteString(a.fn)
-	s.sb.WriteByte('(')
-	err := s.buildColumn(a.arg)
-	if err != nil {
-		return err
-	}
-	s.sb.WriteByte(')')
-	if a.alias != "" {
-		s.buildAlias(a.alias)
-	}
-	return nil
 }
 
 func (s *Selector[T]) buildGroupBy() error {
@@ -234,7 +202,7 @@ func (s *Selector[T]) buildColumns() error {
 		}
 		switch val := c.(type) {
 		case Column:
-			err := s.buildColumn(val.name)
+			err := s.buildColumn(val)
 			if err != nil {
 				return err
 			}
@@ -249,6 +217,85 @@ func (s *Selector[T]) buildColumns() error {
 			}
 		}
 	}
+	return nil
+
+}
+
+func (s *Selector[T]) buildTable(table TableReference) error {
+	switch t := table.(type) {
+	case nil:
+		//什么都没有直接获取本身的
+		s.quote(s.model.TableName)
+	case Table:
+		// 传入了表本身
+		m, err := s.db.r.Get(t.entity)
+		if err != nil {
+			return err
+		}
+		s.quote(m.TableName)
+		if t.alias != "" {
+			s.sb.WriteString(" AS ")
+			s.quote(t.alias)
+		}
+	case Join:
+		// join类型
+		if err := s.buildJoin(t); err != nil {
+			return err
+		}
+	default:
+		return errs.NewErrUnsupportedExpressionType(table)
+	}
+	return nil
+}
+
+func (s *Selector[T]) buildColumn(c Column) error {
+	err := s.builder.buildColumn(c.table, c.name)
+	if err != nil {
+		return err
+	}
+	if c.alias != "" {
+		s.buildAs(c.alias)
+	}
+	return nil
+}
+
+func (s *Selector[T]) buildJoin(j Join) error {
+	s.sb.WriteByte('(')
+	if err := s.buildTable(j.left); err != nil {
+		return err
+	}
+
+	s.sb.WriteString(" ")
+	s.sb.WriteString(j.typ)
+	s.sb.WriteString(" ")
+	if err := s.buildTable(j.right); err != nil {
+		return err
+	}
+
+	if len(j.using) > 0 {
+		s.sb.WriteString(" USING (")
+		for i, col := range j.using {
+			if i > 0 {
+				s.sb.WriteByte(',')
+			}
+			err := s.buildColumn(Column{name: col})
+			if err != nil {
+				return err
+			}
+
+		}
+		s.sb.WriteByte(')')
+	}
+
+	if len(j.on) > 0 {
+		s.sb.WriteString(" ON ")
+		if err := s.buildPredicates(j.on); err != nil {
+			return err
+		}
+
+	}
+
+	s.sb.WriteByte(')')
 	return nil
 
 }

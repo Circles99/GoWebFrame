@@ -32,6 +32,7 @@ type Predicate struct {
 func (p Predicate) expr() {}
 
 func exprOf(e any) Expression {
+	//value 比较特殊, 直接是值形式，其他的都已表达式返回
 	switch val := e.(type) {
 	case Expression:
 		return val

@@ -9,6 +9,124 @@ import (
 	"testing"
 )
 
+func TestSelector_Join(t *testing.T) {
+	//db := memoryDB(t)
+	db, _ := NewDB()
+	type Order struct {
+		Id        int
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	type OrderDetail struct {
+		OrderId int
+		ItemId  int
+
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	type Item struct {
+		Id int
+	}
+
+	testCases := []struct {
+		name      string
+		q         QueryBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			// 虽然泛型是 Order，但是我们传入 OrderDetail
+			name: "specify table",
+			q:    NewSelector[Order](db).From(TableOf(&OrderDetail{})),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `order_detail`;",
+			},
+		},
+		{
+			name: "join",
+			q: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{})
+				return NewSelector[Order](db).
+					From(t1.Join(t2).On(t1.C("Id").Eq(t2.C("OrderId"))))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM (`order` AS `t1` JOIN `order_detail` ON `t1`.`id` = `order_id`);",
+			},
+		},
+		{
+			name: "multiple join",
+			q: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := TableOf(&Item{}).As("t3")
+				return NewSelector[Order](db).
+					From(t1.Join(t2).
+						On(t1.C("Id").Eq(t2.C("OrderId"))).
+						Join(t3).On(t2.C("ItemId").Eq(t3.C("Id"))))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id` = `t2`.`order_id`) JOIN `item` AS `t3` ON `t2`.`item_id` = `t3`.`id`);",
+			},
+		},
+		{
+			name: "left multiple join",
+			q: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := TableOf(&Item{}).As("t3")
+				return NewSelector[Order](db).
+					From(t1.LeftJoin(t2).
+						On(t1.C("Id").Eq(t2.C("OrderId"))).
+						LeftJoin(t3).On(t2.C("ItemId").Eq(t3.C("Id"))))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM ((`order` AS `t1` LEFT JOIN `order_detail` AS `t2` ON `t1`.`id` = `t2`.`order_id`) LEFT JOIN `item` AS `t3` ON `t2`.`item_id` = `t3`.`id`);",
+			},
+		},
+		{
+			name: "right multiple join",
+			q: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := TableOf(&Item{}).As("t3")
+				return NewSelector[Order](db).
+					From(t1.RightJoin(t2).
+						On(t1.C("Id").Eq(t2.C("OrderId"))).
+						RightJoin(t3).On(t2.C("ItemId").Eq(t3.C("Id"))))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM ((`order` AS `t1` RIGHT JOIN `order_detail` AS `t2` ON `t1`.`id` = `t2`.`order_id`) RIGHT JOIN `item` AS `t3` ON `t2`.`item_id` = `t3`.`id`);",
+			},
+		},
+
+		{
+			name: "join multiple using",
+			q: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{})
+				return NewSelector[Order](db).
+					From(t1.Join(t2).Using("UsingCol1", "UsingCol2"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM (`order` AS `t1` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			query, err := tc.q.Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, query)
+		})
+	}
+}
+
 func TestSelector_build(t *testing.T) {
 	db, _ := NewDB()
 	testCase := []struct {
@@ -28,17 +146,17 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "from",
-			q:    NewSelector[TestModel](db).From("`TestModel`"),
+			q:    NewSelector[TestModel](db).From(TableOf(&TestModel{})),
 			wantQuery: &Query{
-				SQL: "SELECT * FROM `TestModel`;",
+				SQL: "SELECT * FROM `test_model`;",
 			},
 			wantErr: nil,
 		},
 		{
 			name: "where",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("FirstName").Eq("王胖子是脑残")),
+			q:    NewSelector[TestModel](db).From(TableOf(&TestModel{})).Where(C("FirstName").Eq("王胖子是脑残")),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE `first_name` = ?;",
+				SQL:  "SELECT * FROM `test_model` WHERE `first_name` = ?;",
 				Args: []any{"王胖子是脑残"},
 			},
 			wantErr: nil,
@@ -46,9 +164,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where GT",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("Age").GT(18)),
+			q:    NewSelector[TestModel](db).From(TableOf(&TestModel{})).Where(C("Age").GT(18)),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE `age` > ?;",
+				SQL:  "SELECT * FROM `test_model` WHERE `age` > ?;",
 				Args: []any{18},
 			},
 			wantErr: nil,
@@ -56,9 +174,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where multiple GT",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(C("Age").GT(18), C("Id").Eq(1)),
+			q:    NewSelector[TestModel](db).From(TableOf(&TestModel{})).Where(C("Age").GT(18), C("Id").Eq(1)),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE (`age` > ?) AND (`id` = ?);",
+				SQL:  "SELECT * FROM `test_model` WHERE (`age` > ?) AND (`id` = ?);",
 				Args: []any{18, 1},
 			},
 			wantErr: nil,
@@ -66,9 +184,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "where not",
-			q:    NewSelector[TestModel](db).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			q:    NewSelector[TestModel](db).From(TableOf(&TestModel{})).Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE NOT (`id` = ?);",
+				SQL:  "SELECT * FROM `test_model` WHERE  NOT (`id` = ?);",
 				Args: []any{2},
 			},
 			wantErr: nil,
@@ -76,9 +194,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "select",
-			q:    NewSelector[TestModel](db).Select(C("Id")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			q:    NewSelector[TestModel](db).Select(C("Id")).From(TableOf(&TestModel{})).Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
-				SQL:  "SELECT `id` FROM `TestModel` WHERE  NOT (`id` = ?);",
+				SQL:  "SELECT `id` FROM `test_model` WHERE  NOT (`id` = ?);",
 				Args: []any{2},
 			},
 			wantErr: nil,
@@ -86,9 +204,9 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "select alias",
-			q:    NewSelector[TestModel](db).Select(C("Id").As("aliasId")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			q:    NewSelector[TestModel](db).Select(C("Id").As("aliasId")).From(TableOf(&TestModel{})).Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
-				SQL:  "SELECT `id` AS `aliasId` FROM `TestModel` WHERE  NOT (`id` = ?);",
+				SQL:  "SELECT `id` AS `aliasId` FROM `test_model` WHERE  NOT (`id` = ?);",
 				Args: []any{2},
 			},
 			wantErr: nil,
@@ -96,27 +214,27 @@ func TestSelector_build(t *testing.T) {
 
 		{
 			name: "select aggregate",
-			q:    NewSelector[TestModel](db).Select(Count("Id")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			q:    NewSelector[TestModel](db).Select(Count("Id")).From(TableOf(&TestModel{})).Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
-				SQL:  "SELECT COUNT(`id`) FROM `TestModel` WHERE  NOT (`id` = ?);",
+				SQL:  "SELECT COUNT(`id`) FROM `test_model` WHERE  NOT (`id` = ?);",
 				Args: []any{2},
 			},
 			wantErr: nil,
 		},
 		{
 			name: "select aggregate as",
-			q:    NewSelector[TestModel](db).Select(Count("Id").AS("aliasId")).From("`TestModel`").Where(Not(C("Id").Eq(2))),
+			q:    NewSelector[TestModel](db).Select(Count("Id").AS("aliasId")).From(TableOf(&TestModel{})).Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
-				SQL:  "SELECT COUNT(`id`) AS `aliasId` FROM `TestModel` WHERE  NOT (`id` = ?);",
+				SQL:  "SELECT COUNT(`id`) AS `aliasId` FROM `test_model` WHERE  NOT (`id` = ?);",
 				Args: []any{2},
 			},
 			wantErr: nil,
 		},
 		{
 			name: "select aggregate as and where",
-			q:    NewSelector[TestModel](db).Select(Count("Id").AS("aliasId")).From("`TestModel`").Where(Avg("Id").EQ(2)),
+			q:    NewSelector[TestModel](db).Select(Count("Id").AS("aliasId")).From(TableOf(&TestModel{})).Where(Avg("Id").EQ(2)),
 			wantQuery: &Query{
-				SQL:  "SELECT COUNT(`id`) AS `aliasId` FROM `TestModel` WHERE AVG(`id`) = ?;",
+				SQL:  "SELECT COUNT(`id`) AS `aliasId` FROM `test_model` WHERE AVG(`id`) = ?;",
 				Args: []any{2},
 			},
 			wantErr: nil,
@@ -254,7 +372,7 @@ func TestSelector_Having(t *testing.T) {
 }
 
 func TestSelector_GroupBy(t *testing.T) {
-	db := memoryDB(t)
+	db, _ := NewDB()
 	testCases := []struct {
 		name      string
 		q         QueryBuilder

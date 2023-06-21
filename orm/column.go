@@ -4,6 +4,7 @@ type Column struct {
 	name    string
 	alias   string
 	orderBy string
+	table   TableReference
 }
 
 // 标记接口
@@ -40,11 +41,11 @@ func C(name string) Column {
 	return Column{name: name}
 }
 
-func (c Column) Eq(value any) Predicate {
+func (c Column) Eq(val any) Predicate {
 	return Predicate{
 		left:  c,
 		op:    opEQ,
-		right: Value{val: value},
+		right: exprOf(val),
 	}
 }
 
@@ -52,7 +53,7 @@ func (c Column) GT(val any) Predicate {
 	return Predicate{
 		left:  c,
 		op:    opGT,
-		right: Value{val: val},
+		right: exprOf(val),
 	}
 }
 
@@ -60,6 +61,6 @@ func (c Column) LT(val any) Predicate {
 	return Predicate{
 		left:  c,
 		op:    opLT,
-		right: Value{val: val},
+		right: exprOf(val),
 	}
 }
