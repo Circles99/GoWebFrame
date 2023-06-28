@@ -1,8 +1,10 @@
 package orm
 
 import (
+	"GoWebFrame/orm/errs"
 	"GoWebFrame/orm/interal/model"
 	"GoWebFrame/orm/interal/valuer"
+	"context"
 	"database/sql"
 )
 
@@ -52,6 +54,60 @@ func NewDB(opts ...DBOption) (*DB, error) {
 		opt(db)
 	}
 	return db, nil
+}
+
+// BeginTx 开起事务
+// @author: liujiming
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	tx, err := db.db.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{
+		tx: tx,
+		db: db,
+	}, nil
+}
+
+func (db *DB) Close() error {
+	return db.db.Close()
+}
+
+func (db *DB) getCore() core {
+	return db.core
+}
+
+func (db *DB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return db.db.QueryContext(ctx, query, args...)
+}
+
+func (db *DB) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return db.db.ExecContext(ctx, query, args...)
+}
+
+// DoTx 帮维护事务的执行
+// @author: liujiming
+func (db *DB) DoTx(ctx context.Context, fn func(ctx context.Context, tx *Tx) error, opts *sql.TxOptions) (err error) {
+	var tx *Tx
+	tx, err = db.BeginTx(ctx, opts)
+	if err != nil {
+		return err
+	}
+
+	panicked := true
+	defer func() {
+		if panicked || err != nil {
+			if e := tx.Rollback(); e != nil {
+				err = errs.NewErrFailToRollbackTx(err, e, panicked)
+			}
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
+	err = fn(ctx, tx)
+	panicked = false
+	return err
 }
 
 //

@@ -7,7 +7,7 @@ import (
 
 var _ session = &Tx{}
 
-//var _ session = &DB{}
+var _ session = &DB{}
 
 // session 代表一个抽象的概念，即会话
 // 暂时做成私有的，后面考虑重构，因为这个东西用户可能有点难以理解

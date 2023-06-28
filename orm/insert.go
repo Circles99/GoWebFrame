@@ -3,6 +3,7 @@ package orm
 import (
 	"GoWebFrame/orm/errs"
 	"GoWebFrame/orm/interal/model"
+	"context"
 	"reflect"
 )
 
@@ -26,7 +27,7 @@ type Inserter[T any] struct {
 	columns []string
 	// 赋值
 	values []*T
-	db     *DB
+	sess   session
 	// 此处利用OnDuplicateKey 方法调用OnDuplicateBuilder, 从OnDuplicateBuilder 调用Update 回到inserter
 	onDuplicate *OnDuplicateKey
 
@@ -34,12 +35,14 @@ type Inserter[T any] struct {
 	//onDuplicate []Assignable
 }
 
-func NewInserter[T any](db *DB) *Inserter[T] {
+func NewInserter[T any](s session) *Inserter[T] {
+	c := s.getCore()
 	return &Inserter[T]{
-		db: db,
+		sess: s,
 		builder: builder{
-			dialect: db.dialect,
-			quoter:  db.dialect.quoter(),
+			core:    c,
+			dialect: c.dialect,
+			quoter:  c.dialect.quoter(),
 		},
 	}
 }
@@ -66,7 +69,7 @@ func (i Inserter[T]) Build() (*Query, error) {
 	}
 
 	// 解析model, values都是model
-	m, err := i.db.r.Get(i.values[0])
+	m, err := i.r.Get(i.values[0])
 	if err != nil {
 		return nil, err
 	}
@@ -131,4 +134,11 @@ func (i Inserter[T]) Build() (*Query, error) {
 		SQL:  i.sb.String(),
 		Args: i.args,
 	}, nil
+}
+
+func (i *Inserter[T]) Exec(ctx context.Context) Result {
+	return exec(ctx, i.sess, i.core, &QueryContext{
+		Builder: i,
+		Type:    "INSERT",
+	})
 }

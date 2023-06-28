@@ -125,7 +125,6 @@ func (b *builder) buildExpression(e Expression) error {
 	case Aggregate:
 		return b.buildAggregate(exp)
 	case Value:
-
 		b.sb.WriteByte('?')
 		b.addArgs(exp.val)
 	case RawExpr:

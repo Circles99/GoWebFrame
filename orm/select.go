@@ -10,7 +10,7 @@ type Selector[T any] struct {
 	tbl     TableReference
 	where   []Predicate
 	columns []selectedAlias
-	db      *DB
+	sess    session
 	offset  int
 	limit   int
 	groupBy []Column
@@ -25,16 +25,16 @@ type Selector[T any] struct {
 //	}
 //}
 
-func NewSelector[T any](db *DB) *Selector[T] {
+func NewSelector[T any](s session) *Selector[T] {
 	// 获取不同session的实例
-	//c := sess.getCore()
+	c := s.getCore()
 	return &Selector[T]{
-		db: db,
+		sess: s,
 		// builder实例化
 		builder: builder{
-			core:    db.core,
-			dialect: db.dialect,
-			quoter:  db.dialect.quoter(),
+			core:    c,
+			dialect: c.dialect,
+			quoter:  c.dialect.quoter(),
 		},
 	}
 }
@@ -88,7 +88,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 		err error
 	)
 
-	s.model, err = s.db.r.Get(&t)
+	s.model, err = s.r.Get(&t)
 	if err != nil {
 		return nil, err
 	}
@@ -145,21 +145,40 @@ func (s *Selector[T]) Build() (*Query, error) {
 }
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
-	query, err := s.Build()
-	if err != nil {
-		return nil, err
-	}
-	// 获取数据
-	rows, err := s.db.db.QueryContext(ctx, query.SQL, query.Args)
+
+	//query, err := s.Build()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//// 获取数据
+	//rows, err := s.sess.queryContext(ctx, query.SQL, query.Args)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//t := new(T)
+	//val := s.sess.getCore().valCreator(t, s.model)
+	//// 在这里灵活切换反射或者 unsafe
+	//
+	//return t, val.SetColumns(rows)
+
+	var t T
+	m, err := s.r.Get(t)
 	if err != nil {
 		return nil, err
 	}
 
-	t := new(T)
-	val := s.db.core.valCreator(t, s.model)
-	// 在这里灵活切换反射或者 unsafe
+	res := get[T](ctx, s.core, s.sess, &QueryContext{
+		Builder: s,
+		Type:    "SELECT",
+		Model:   m,
+	})
+	if res.Result != nil {
+		return res.Result.(*T), res.Err
+	}
+	return nil, res.Err
 
-	return t, val.SetColumns(rows)
+	//
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
@@ -228,7 +247,7 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 		s.quote(s.model.TableName)
 	case Table:
 		// 传入了表本身
-		m, err := s.db.r.Get(t.entity)
+		m, err := s.r.Get(t.entity)
 		if err != nil {
 			return err
 		}
