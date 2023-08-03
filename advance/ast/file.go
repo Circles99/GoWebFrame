@@ -59,7 +59,7 @@ func (t typeVisitor) Visit(node ast.Node) (w ast.Visitor) {
 		}
 
 	case *ast.ArrayType:
-	//typ =
+		typ = "[]byte"
 	default:
 		panic("不支持类型")
 	}
