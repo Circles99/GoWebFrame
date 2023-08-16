@@ -8,7 +8,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.14.0
 )
 
-require github.com/DATA-DOG/go-sqlmock v1.5.0 // indirect
+require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
+)
 
 require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
