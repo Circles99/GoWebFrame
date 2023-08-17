@@ -11,7 +11,9 @@ import (
 
 var (
 	//go:embed lua/unlock.lua
-	luaUnlock                string
+	luaUnlock string
+	//go:embed lua/refresh.lua
+	luaRefresh               string
 	ErrorFailedToPreemptLock = errors.New("redis-lock: 抢锁失败")
 	ErrLockNotHold           = errors.New("rlock: 未持有锁")
 )
@@ -36,16 +38,32 @@ func (c *Client) TryLock(ctx context.Context, key string, expiration time.Durati
 	}
 
 	return &Lock{
-		client: c.client,
-		key:    key,
-		value:  val,
+		client:     c.client,
+		key:        key,
+		value:      val,
+		expiration: expiration,
 	}, nil
 }
 
 type Lock struct {
-	client redis.Cmdable
-	key    string
-	value  string
+	client     redis.Cmdable
+	key        string
+	value      string
+	expiration time.Duration
+}
+
+func (l Lock) Refresh(ctx context.Context) error {
+
+	res, err := l.client.Eval(ctx, luaRefresh, []string{l.key}, l.value, l.expiration.Seconds()).Int64()
+	if err != nil {
+		return err
+	}
+
+	if res != 1 {
+		return ErrLockNotHold
+	}
+
+	return nil
 }
 
 func (l Lock) UnLock(ctx context.Context) error {
@@ -61,15 +79,15 @@ func (l Lock) UnLock(ctx context.Context) error {
 		return ErrLockNotHold
 	}
 
-	// 把键值对删掉
-	cnt, err := l.client.Del(ctx, l.key).Result()
-	if err != nil {
-		return err
-	}
-
-	if cnt != 1 {
-		// 代表你家的锁过期了
-		return errors.New("redis-lock， 解锁失败")
-	}
+	//// 把键值对删掉
+	//cnt, err := l.client.Del(ctx, l.key).Result()
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//if cnt != 1 {
+	//	// 代表你家的锁过期了
+	//	return errors.New("redis-lock， 解锁失败")
+	//}
 	return nil
 }
