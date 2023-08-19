@@ -4,8 +4,10 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/sync/singleflight"
 	"time"
 )
 
@@ -13,7 +15,9 @@ var (
 	//go:embed lua/unlock.lua
 	luaUnlock string
 	//go:embed lua/refresh.lua
-	luaRefresh               string
+	luaRefresh string
+	//go:embed lua/lock.lua
+	luaLock                  string
 	ErrorFailedToPreemptLock = errors.New("redis-lock: 抢锁失败")
 	ErrLockNotHold           = errors.New("rlock: 未持有锁")
 )
@@ -21,6 +25,73 @@ var (
 // Client 就是对redis.Cmdable的二次封装
 type Client struct {
 	client redis.Cmdable
+	g      singleflight.Group
+}
+
+func (c *Client) SingleflightLock(ctx context.Context, key string, expiration time.Duration, timeout time.Duration, retry RetryStrategy) (*Lock, error) {
+	for {
+		flag := false
+		resChan := c.g.DoChan(key, func() (interface{}, error) {
+			flag = true
+			return c.Lock(ctx, key, expiration, timeout, retry)
+		})
+		select {
+		case res := <-resChan:
+			if flag {
+				// 确保下一个循环 另一个goroutine触发
+				c.g.Forget(key)
+				if res.Err != nil {
+					return nil, res.Err
+				}
+				return res.Val.(*Lock), nil
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
+func (c *Client) Lock(ctx context.Context, key string, expiration time.Duration, timeout time.Duration, retry RetryStrategy) (*Lock, error) {
+
+	var timer *time.Timer
+
+	val := uuid.New().String()
+
+	for {
+		lctx, cancel := context.WithTimeout(ctx, timeout)
+		res, err := c.client.Eval(lctx, luaLock, []string{key}, val, expiration.Seconds()).Result()
+		cancel()
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
+		}
+
+		if res == "OK" {
+			//加锁成功了
+			return &Lock{
+				client:     c.client,
+				key:        key,
+				value:      val,
+				expiration: expiration,
+				UnlockChan: make(chan struct{}, 1),
+			}, nil
+		}
+
+		interval, ok := retry.Next()
+		if !ok {
+			return nil, fmt.Errorf("redis-lock 超出重试限制 %s", ErrorFailedToPreemptLock)
+		}
+		if timer == nil {
+			timer = time.NewTimer(interval)
+		} else {
+			timer.Reset(interval)
+		}
+
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }
 
 func (c *Client) TryLock(ctx context.Context, key string, expiration time.Duration) (*Lock, error) {
@@ -42,6 +113,7 @@ func (c *Client) TryLock(ctx context.Context, key string, expiration time.Durati
 		key:        key,
 		value:      val,
 		expiration: expiration,
+		UnlockChan: make(chan struct{}, 1),
 	}, nil
 }
 
@@ -117,7 +189,13 @@ func (l *Lock) UnLock(ctx context.Context) error {
 
 	defer func() {
 		// 可使用once保护一下这个只允许呗调用一次
-		close(l.UnlockChan)
+		//close(l.UnlockChan)
+		select {
+		case l.UnlockChan <- struct{}{}:
+		default:
+			// 说明没有人调用
+		}
+
 	}()
 
 	if err != nil {
