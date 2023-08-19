@@ -50,9 +50,53 @@ type Lock struct {
 	key        string
 	value      string
 	expiration time.Duration
+	UnlockChan chan struct{}
 }
 
-func (l Lock) Refresh(ctx context.Context) error {
+// AutoRefresh 自动续约， 总体还是需要用户自己管
+func (l *Lock) AutoRefresh(interval time.Duration, timeout time.Duration) error {
+	timeoutChan := make(chan struct{}, 1)
+	// 间隔多久续约一次
+	ticker := time.NewTicker(interval)
+	for {
+		select {
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			// 出现了error咋 办
+			err := l.Refresh(ctx)
+			cancel()
+
+			if err == context.DeadlineExceeded {
+				timeoutChan <- struct{}{}
+				continue
+			}
+
+			if err != nil {
+				return err
+			}
+		case <-timeoutChan:
+			// 超时了重写调动刷新
+			// 可以用次数控制住刷新
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			err := l.Refresh(ctx)
+			cancel()
+
+			if err == context.DeadlineExceeded {
+				timeoutChan <- struct{}{}
+				continue
+			}
+
+			if err != nil {
+				return err
+			}
+
+		case <-l.UnlockChan:
+			return nil
+		}
+	}
+}
+
+func (l *Lock) Refresh(ctx context.Context) error {
 
 	res, err := l.client.Eval(ctx, luaRefresh, []string{l.key}, l.value, l.expiration.Seconds()).Int64()
 	if err != nil {
@@ -66,11 +110,16 @@ func (l Lock) Refresh(ctx context.Context) error {
 	return nil
 }
 
-func (l Lock) UnLock(ctx context.Context) error {
+func (l *Lock) UnLock(ctx context.Context) error {
 
 	// 使用lua脚本，必须保证其步骤在同一个原子操作中完成
-
 	res, err := l.client.Eval(ctx, luaUnlock, []string{l.key}, l.value).Int64()
+
+	defer func() {
+		// 可使用once保护一下这个只允许呗调用一次
+		close(l.UnlockChan)
+	}()
+
 	if err != nil {
 		return err
 	}
