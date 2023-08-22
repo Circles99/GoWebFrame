@@ -137,22 +137,5 @@ func (c *Client) Send(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	lenBs := make([]byte, 8)
-	_, err = conn.Read(lenBs)
-	if err != nil {
-		return nil, err
-	}
-
-	// todo 大顶端和小顶端，看编码是高位在第一个字节还是地位在第一个字节，
-	// 我响应有多长
-	length := binary.BigEndian.Uint64(lenBs)
-
-	respBs := make([]byte, length)
-
-	_, err = conn.Read(respBs)
-	if err != nil {
-		return nil, err
-	}
-
-	return respBs, nil
+	return ReadMsg(conn)
 }

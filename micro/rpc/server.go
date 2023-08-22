@@ -49,20 +49,8 @@ func (s *Server) Start(network, addr string) error {
 // 响应也是这个规范
 func (s *Server) handleConn(conn net.Conn) error {
 	for {
-		// lenBs 是长度字段的字节表示
-		lenBs := make([]byte, 8)
-		_, err := conn.Read(lenBs)
-		if err != nil {
-			return err
-		}
 
-		// todo 大顶端和小顶端，看编码是高位在第一个字节还是地位在第一个字节，
-		// 我消息有多长
-		length := binary.BigEndian.Uint64(lenBs)
-
-		reqBs := make([]byte, length)
-
-		_, err = conn.Read(reqBs)
+		reqBs, err := ReadMsg(conn)
 		if err != nil {
 			return err
 		}
