@@ -25,4 +25,16 @@ func ReadMsg(conn net.Conn) ([]byte, error) {
 	return data, nil
 }
 
-//func EncodeMsg(data []byte)
+func EncodeMsg(data []byte) []byte {
+	reqLen := len(data)
+	// 我要在这构建相应数据
+
+	// 这里+8是因为上面又8个字节
+	res := make([]byte, reqLen+8)
+
+	// 第一步 把长度写进去前8个字节
+	binary.BigEndian.PutUint64(res[:8], uint64(reqLen))
+	// 第二步 把长度写入数据
+	copy(res[8:], data)
+	return res
+}

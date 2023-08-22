@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"net"
@@ -121,17 +120,7 @@ func (c *Client) Send(data []byte) ([]byte, error) {
 		_ = conn.Close()
 	}()
 
-	reqLen := len(data)
-	// 我要在这构建相应数据
-
-	// 这里+8是因为上面又8个字节
-	req := make([]byte, reqLen+8)
-
-	// 第一步 把长度写进去前8个字节
-	binary.BigEndian.PutUint64(req[:8], uint64(reqLen))
-	// 第二步 把长度写入数据
-	copy(req[8:], data)
-
+	req := EncodeMsg(data)
 	_, err = conn.Write(req)
 	if err != nil {
 		return nil, err

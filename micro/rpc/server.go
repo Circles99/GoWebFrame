@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"golang.org/x/net/context"
@@ -10,17 +9,20 @@ import (
 )
 
 type Server struct {
-	services map[string]Service
+	services map[string]reflectionStub
 }
 
 func NewServer() *Server {
 	return &Server{
-		services: make(map[string]Service, 16),
+		services: make(map[string]reflectionStub, 16),
 	}
 }
 
 func (s Server) RegisterService(service Service) {
-	s.services[service.Name()] = service
+	s.services[service.Name()] = reflectionStub{
+		s:     service,
+		value: reflect.ValueOf(service),
+	}
 }
 
 func (s *Server) Start(network, addr string) error {
@@ -55,22 +57,20 @@ func (s *Server) handleConn(conn net.Conn) error {
 			return err
 		}
 
-		respData, err := s.handleMsg(reqBs)
+		// 还愿调用信息
+		req := &Request{}
+		err = json.Unmarshal(reqBs, req)
+		if err != nil {
+			return err
+		}
+		resp, err := s.Invoke(context.Background(), req)
+
 		if err != nil {
 			// 这个可能是业务error
 			return err
 		}
 
-		respLen := len(respData)
-		// 我要在这构建相应数据
-
-		// 这里+8是因为上面又8个字节
-		res := make([]byte, respLen+8)
-
-		// 第一步 把长度写进去前8个字节
-		binary.BigEndian.PutUint64(res[:8], uint64(respLen))
-		// 第二步 把长度写入数据
-		copy(res[8:], respData)
+		res := EncodeMsg(resp.Data)
 
 		_, err = conn.Write(res)
 		if err != nil {
@@ -83,13 +83,8 @@ func (s *Server) handleConn(conn net.Conn) error {
 	}
 }
 
-func (s *Server) handleMsg(reqData []byte) ([]byte, error) {
-	// 还愿调用信息
-	req := &Request{}
-	err := json.Unmarshal(reqData, req)
-	if err != nil {
-		return nil, err
-	}
+func (s *Server) Invoke(ctx context.Context, req *Request) (*Response, error) {
+
 	// 还愿了调用信息，已经知道参数
 	// 发起业务调用
 	service, ok := s.services[req.ServiceName]
@@ -97,10 +92,21 @@ func (s *Server) handleMsg(reqData []byte) ([]byte, error) {
 		return nil, errors.New("调用的服务不存在")
 	}
 
-	// 反射找到方法，并且执行调用
-	val := reflect.ValueOf(service)
+	resp, err := service.Invoke(ctx, req.MethodName, req.Arg)
+	if err != nil {
+		return nil, err
+	}
+	return &Response{Data: resp}, nil
+}
 
-	method := val.MethodByName(req.MethodName)
+type reflectionStub struct {
+	s     Service
+	value reflect.Value
+}
+
+func (r reflectionStub) Invoke(ctx context.Context, methodName string, data []byte) ([]byte, error) {
+
+	method := r.value.MethodByName(methodName)
 
 	in := make([]reflect.Value, 2)
 	in[0] = reflect.ValueOf(context.Background())
@@ -109,7 +115,7 @@ func (s *Server) handleMsg(reqData []byte) ([]byte, error) {
 	//val.Type().In(0)
 	// 重新造一个arg真正的类型进行赋值
 	inReq := reflect.New(method.Type().In(1).Elem())
-	err = json.Unmarshal(req.Arg, inReq.Interface())
+	err := json.Unmarshal(data, inReq.Interface())
 	if err != nil {
 		return nil, err
 	}
@@ -123,5 +129,4 @@ func (s *Server) handleMsg(reqData []byte) ([]byte, error) {
 	}
 
 	return json.Marshal(results[0].Interface())
-
 }
