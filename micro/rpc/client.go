@@ -40,11 +40,11 @@ func setFuncField(service Service, p Proxy) error {
 		// 我要设置值给 getbyId
 
 		if fieldVal.CanSet() {
+			// 创建函数
 			fnVal := reflect.MakeFunc(fieldTyp.Type, func(args []reflect.Value) (results []reflect.Value) {
 				//这个地方才是真正的将本地调用捕捉到的地方
 				// args[0]是context
 				ctx := args[0].Interface().(context.Context)
-
 				// args[1]是request
 				retVal := reflect.New(fieldTyp.Type.Out(0).Elem())
 				reqData, err := json.Marshal(args[1].Interface())
