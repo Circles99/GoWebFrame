@@ -130,7 +130,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 		// 第一步 把长度写进去前8个字节
 		binary.BigEndian.PutUint64(res[:numOfLengthBytes], uint64(respLen))
 		// 第二步 把长度写入数据
-		copy(res[8:], respData)
+		copy(res[numOfLengthBytes:], respData)
 
 		_, err = conn.Write(res)
 		if err != nil {
