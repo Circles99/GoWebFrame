@@ -58,7 +58,7 @@ func setFuncField(service Service, p Proxy) error {
 					//slice.Map[reflect.Value, any](args, func(idx int, src reflect.Value) any {
 					//	return src.Interface()
 					//}),
-					Data: reqData,
+					Arg: reqData,
 				}
 
 				// 要真的发起调用
