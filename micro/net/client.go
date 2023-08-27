@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const numOfLengthBytes = 8
+
 func Connect(network, addr string) error {
 	conn, err := net.DialTimeout(network, addr, time.Second)
 	if err != nil {
@@ -38,24 +40,30 @@ type Client struct {
 }
 
 func (c *Client) Send(data string) (string, error) {
+	// 连接服务端口
 	conn, err := net.DialTimeout(c.network, c.addr, time.Second)
 	if err != nil {
 		return "", err
 	}
 
+	// 退出的时候关闭连接
 	defer func() {
 		_ = conn.Close()
 	}()
 
+	// 获取send数据大小
 	reqLen := len(data)
 	// 我要在这构建相应数据
 
-	// 这里+8是因为上面又8个字节
-	req := make([]byte, reqLen+8)
+	// 这里和服务端，在大送到服务端时，前8个直接就已经是告知整个数据大小
+
+	// 这里+8是需要把数据长度写入
+	req := make([]byte, reqLen+numOfLengthBytes)
 
 	// 第一步 把长度写进去前8个字节
-	binary.BigEndian.PutUint64(req[:8], uint64(reqLen))
-	// 第二步 把长度写入数据
+	// 编码写入到前8个字节
+	binary.BigEndian.PutUint64(req[:numOfLengthBytes], uint64(reqLen))
+	// 第二步 把数据写入
 	copy(req[8:], data)
 
 	_, err = conn.Write(req)
@@ -63,7 +71,7 @@ func (c *Client) Send(data string) (string, error) {
 		return "", err
 	}
 
-	lenBs := make([]byte, 8)
+	lenBs := make([]byte, numOfLengthBytes)
 	_, err = conn.Read(lenBs)
 	if err != nil {
 		return "", err
