@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"GoWebFrame/micro/rpc/message"
 	"encoding/json"
 	"errors"
 	"golang.org/x/net/context"
@@ -58,7 +59,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 		}
 
 		// 还愿调用信息
-		req := &Request{}
+		req := &message.Request{}
 		err = json.Unmarshal(reqBs, req)
 		if err != nil {
 			return err
@@ -83,7 +84,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 	}
 }
 
-func (s *Server) Invoke(ctx context.Context, req *Request) (*Response, error) {
+func (s *Server) Invoke(ctx context.Context, req *message.Request) (*message.Response, error) {
 
 	// 还愿了调用信息，已经知道参数
 	// 发起业务调用
@@ -96,7 +97,7 @@ func (s *Server) Invoke(ctx context.Context, req *Request) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Response{Data: resp}, nil
+	return &message.Response{Data: resp}, nil
 }
 
 type reflectionStub struct {
