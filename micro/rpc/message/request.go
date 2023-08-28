@@ -52,6 +52,23 @@ func EncodeReq(req *Request) []byte {
 	cur = cur[1:]
 	copy(cur, req.MethodName)
 
+	// 元数据部分
+	cur = cur[len(req.MethodName):]
+	cur[0] = '\n'
+	cur = cur[1:]
+	for key, value := range req.Meta {
+		copy(cur, key)
+		cur = cur[len(key):]
+		cur[0] = '\r'
+		cur = cur[1:]
+		copy(cur, value)
+		cur = cur[len(value):]
+		cur[0] = '\n'
+		cur = cur[1:]
+	}
+
+	copy(cur, req.Data)
+
 	return bs
 }
 
@@ -79,7 +96,35 @@ func DecodeReq(data []byte) *Request {
 	index := bytes.IndexByte(data, '\n')
 	// 引入分隔符，切分sericeName 和 methodName
 	req.ServiceName = string(data[:index])
-	// index 所在分割符本身
-	req.MethodName = string(data[index+1:])
+	// index 所在分割符本身 所以加1
+	data = data[index+1:]
+
+	index = bytes.IndexByte(data, '\n')
+	req.MethodName = string(data[:index])
+	// 跳过分隔符
+	data = data[index+1:]
+	// 剩下的是meta解析
+
+	index = bytes.IndexByte(data, '\n')
+
+	if index != -1 {
+		meta := make(map[string]string, 4)
+		// -1 代表没找到index
+		for index != -1 {
+			pair := data[:index]
+			// /r的位置
+			pairIndex := bytes.IndexByte(pair, '\r')
+			key := string(pair[:pairIndex])
+			value := string(pair[pairIndex+1:])
+			meta[key] = value
+			data = data[index+1:]
+			index = bytes.IndexByte(data, '\n')
+		}
+		req.Meta = meta
+	}
+
+	req.Data = data
+
 	return req
+
 }
