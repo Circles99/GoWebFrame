@@ -7,6 +7,7 @@ import (
 
 func ReadMsg(conn net.Conn) ([]byte, error) {
 	lenBs := make([]byte, 8)
+
 	_, err := conn.Read(lenBs)
 	if err != nil {
 		return nil, err
@@ -14,14 +15,17 @@ func ReadMsg(conn net.Conn) ([]byte, error) {
 
 	// todo 大顶端和小顶端，看编码是高位在第一个字节还是地位在第一个字节，
 	// 我响应有多长
-	length := binary.BigEndian.Uint64(lenBs)
+	headerLength := binary.BigEndian.Uint32(lenBs[:4])
+	bodyLength := binary.BigEndian.Uint32(lenBs[4:])
+	length := headerLength + bodyLength
 
 	data := make([]byte, length)
 
-	_, err = conn.Read(data)
+	_, err = conn.Read(data[8:])
 	if err != nil {
 		return nil, err
 	}
+	copy(data[:8], lenBs)
 	return data, nil
 }
 
