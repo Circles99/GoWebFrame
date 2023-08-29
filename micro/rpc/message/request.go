@@ -88,42 +88,46 @@ func DecodeReq(data []byte) *Request {
 	req.Compresser = data[13]
 	req.Serializer = data[14]
 
-	data = data[15:]
+	// body 和 header切割开
+	header := data[15:req.HeadLength]
 
 	// 近似于
 	//User-service
 	//GetById
-	index := bytes.IndexByte(data, '\n')
+	index := bytes.IndexByte(header, '\n')
 	// 引入分隔符，切分sericeName 和 methodName
-	req.ServiceName = string(data[:index])
+	req.ServiceName = string(header[:index])
 	// index 所在分割符本身 所以加1
-	data = data[index+1:]
+	header = header[index+1:]
 
-	index = bytes.IndexByte(data, '\n')
-	req.MethodName = string(data[:index])
+	index = bytes.IndexByte(header, '\n')
+	req.MethodName = string(header[:index])
 	// 跳过分隔符
-	data = data[index+1:]
+	header = header[index+1:]
 	// 剩下的是meta解析
 
-	index = bytes.IndexByte(data, '\n')
+	index = bytes.IndexByte(header, '\n')
 
 	if index != -1 {
 		meta := make(map[string]string, 4)
 		// -1 代表没找到index
 		for index != -1 {
-			pair := data[:index]
+			pair := header[:index]
 			// /r的位置
 			pairIndex := bytes.IndexByte(pair, '\r')
 			key := string(pair[:pairIndex])
 			value := string(pair[pairIndex+1:])
 			meta[key] = value
-			data = data[index+1:]
-			index = bytes.IndexByte(data, '\n')
+			header = header[index+1:]
+			index = bytes.IndexByte(header, '\n')
 		}
 		req.Meta = meta
 	}
 
-	req.Data = data
+	if req.BodyLength != 0 {
+		// data从req.HeadLength之后都是body
+		req.Data = data[req.HeadLength:]
+	}
 
 	return req
 

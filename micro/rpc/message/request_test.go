@@ -11,6 +11,7 @@ func TestEncodeDecode(t *testing.T) {
 		req  *Request
 	}{
 		{
+			// 可禁止开发者在meta使用\n \r
 			name: "normal",
 			req: &Request{
 				HeadLength: 120,
