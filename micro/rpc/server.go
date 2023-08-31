@@ -2,7 +2,8 @@ package rpc
 
 import (
 	"GoWebFrame/micro/rpc/message"
-	"encoding/json"
+	"GoWebFrame/micro/rpc/serializer"
+	"GoWebFrame/micro/rpc/serializer/json"
 	"errors"
 	"golang.org/x/net/context"
 	"net"
@@ -10,19 +11,31 @@ import (
 )
 
 type Server struct {
-	services map[string]reflectionStub
+	services    map[string]reflectionStub
+	serializers map[uint8]serializer.Serializer
 }
 
 func NewServer() *Server {
-	return &Server{
-		services: make(map[string]reflectionStub, 16),
+
+	res := &Server{
+		services:    make(map[string]reflectionStub, 16),
+		serializers: make(map[uint8]serializer.Serializer, 4),
 	}
+
+	res.RegisterSerializers(&json.Serializer{})
+
+	return res
+}
+
+func (s Server) RegisterSerializers(sl serializer.Serializer) {
+	s.serializers[sl.Code()] = sl
 }
 
 func (s Server) RegisterService(service Service) {
 	s.services[service.Name()] = reflectionStub{
-		s:     service,
-		value: reflect.ValueOf(service),
+		s:           service,
+		value:       reflect.ValueOf(service),
+		serializers: s.serializers,
 	}
 }
 
@@ -102,7 +115,7 @@ func (s *Server) Invoke(ctx context.Context, req *message.Request) (*message.Res
 	if !ok {
 		return resp, errors.New("调用的服务不存在")
 	}
-	respData, err := service.Invoke(ctx, req.MethodName, req.Data)
+	respData, err := service.Invoke(ctx, req)
 
 	resp.Data = respData
 	if err != nil {
@@ -113,13 +126,14 @@ func (s *Server) Invoke(ctx context.Context, req *message.Request) (*message.Res
 }
 
 type reflectionStub struct {
-	s     Service
-	value reflect.Value
+	s           Service
+	value       reflect.Value
+	serializers map[uint8]serializer.Serializer
 }
 
-func (r reflectionStub) Invoke(ctx context.Context, methodName string, data []byte) ([]byte, error) {
+func (r *reflectionStub) Invoke(ctx context.Context, req *message.Request) ([]byte, error) {
 
-	method := r.value.MethodByName(methodName)
+	method := r.value.MethodByName(req.MethodName)
 
 	in := make([]reflect.Value, 2)
 	in[0] = reflect.ValueOf(context.Background())
@@ -128,7 +142,13 @@ func (r reflectionStub) Invoke(ctx context.Context, methodName string, data []by
 	//val.Type().In(0)
 	// 重新造一个arg真正的类型进行赋值
 	inReq := reflect.New(method.Type().In(1).Elem())
-	err := json.Unmarshal(data, inReq.Interface())
+
+	serializer, ok := r.serializers[req.Serializer]
+	if !ok {
+		return nil, errors.New("不支持的序列化协议")
+	}
+
+	err := serializer.Decode(req.Data, inReq.Interface())
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +168,7 @@ func (r reflectionStub) Invoke(ctx context.Context, methodName string, data []by
 		return nil, err
 	} else {
 		var er error
-		res, er = json.Marshal(results[0].Interface())
+		res, er = serializer.Encode(results[0].Interface())
 		if er != nil {
 			return nil, er
 		}

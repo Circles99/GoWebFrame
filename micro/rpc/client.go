@@ -2,8 +2,9 @@ package rpc
 
 import (
 	"GoWebFrame/micro/rpc/message"
+	"GoWebFrame/micro/rpc/serializer"
+	"GoWebFrame/micro/rpc/serializer/json"
 	"context"
-	"encoding/json"
 	"errors"
 	"net"
 	"reflect"
@@ -14,12 +15,12 @@ import (
 // 不是grpc那种生成文件
 
 // InitClientProxy 要为 GetById之类的函数类型字段赋值
-func InitClientProxy(addr string, service Service) error {
-	client := NewClient(addr)
-	return setFuncField(service, client)
+func (c *Client) InitClientProxy(addr string, service Service) error {
+	//client := NewClient(addr)
+	return setFuncField(service, c, c.serializer)
 }
 
-func setFuncField(service Service, p Proxy) error {
+func setFuncField(service Service, p Proxy, s serializer.Serializer) error {
 	if service == nil {
 		return errors.New("不支持nil")
 	}
@@ -43,11 +44,13 @@ func setFuncField(service Service, p Proxy) error {
 			// 创建函数
 			fnVal := reflect.MakeFunc(fieldTyp.Type, func(args []reflect.Value) (results []reflect.Value) {
 				//这个地方才是真正的将本地调用捕捉到的地方
+
+				retVal := reflect.New(fieldTyp.Type.Out(0).Elem())
+
 				// args[0]是context
 				ctx := args[0].Interface().(context.Context)
 				// args[1]是request
-				retVal := reflect.New(fieldTyp.Type.Out(0).Elem())
-				reqData, err := json.Marshal(args[1].Interface())
+				reqData, err := s.Encode(args[1].Interface())
 				if err != nil {
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
@@ -59,7 +62,8 @@ func setFuncField(service Service, p Proxy) error {
 					//slice.Map[reflect.Value, any](args, func(idx int, src reflect.Value) any {
 					//	return src.Interface()
 					//}),
-					Data: reqData,
+					Serializer: s.Code(),
+					Data:       reqData,
 				}
 				req.CalculateHeaderLength()
 				req.CalculateBodyLength()
@@ -76,7 +80,7 @@ func setFuncField(service Service, p Proxy) error {
 				}
 
 				if len(resp.Data) > 0 {
-					err = json.Unmarshal(resp.Data, retVal.Interface())
+					err = s.Decode(resp.Data, retVal.Interface())
 					if err != nil {
 						// 返序列化的errir
 						return []reflect.Value{retVal, reflect.ValueOf(err)}
@@ -102,13 +106,24 @@ func setFuncField(service Service, p Proxy) error {
 }
 
 type Client struct {
+	serializer serializer.Serializer
+
 	addr string
 }
 
-func NewClient(addr string) *Client {
-	return &Client{
-		addr: addr,
+type ClientOption func(client *Client)
+
+func NewClient(addr string, options ...ClientOption) *Client {
+	res := &Client{
+		addr:       addr,
+		serializer: &json.Serializer{},
 	}
+
+	for _, opt := range options {
+		opt(res)
+	}
+
+	return res
 }
 
 func (c Client) Invoke(ctx context.Context, req *message.Request) (*message.Response, error) {

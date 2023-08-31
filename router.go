@@ -78,7 +78,7 @@ func (r *router) addRouter(method, path string, handleFunc HandleFunc, mds ...Mi
 	// 切分path, 因为第一个是/，前面已经创建了根节点，所以从之后开始
 	for _, s := range segs {
 		if s == "" {
-			panic(fmt.Sprint("非法路由"))
+			panic("非法路由")
 		}
 
 		// 每次循环覆盖一个新的子节点

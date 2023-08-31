@@ -105,7 +105,7 @@ func (n *node) equal(y *node) (string, bool) {
 	}
 
 	if y.path != n.path {
-		return fmt.Sprintf("节点路径不匹配"), false
+		return fmt.Sprint("节点路径不匹配"), false
 	}
 
 	if n.adaptiveChild != nil {
