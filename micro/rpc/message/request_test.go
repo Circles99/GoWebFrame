@@ -32,8 +32,8 @@ func TestEncodeDecode(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc.req.calculateHeaderLength()
-		tc.req.calculateBodyLength()
+		tc.req.CalculateHeaderLength()
+		tc.req.CalculateBodyLength()
 		t.Run(tc.name, func(t *testing.T) {
 			data := EncodeReq(tc.req)
 			req := DecodeReq(data)
@@ -41,19 +41,4 @@ func TestEncodeDecode(t *testing.T) {
 		})
 	}
 
-}
-
-func (req *Request) calculateHeaderLength() {
-	// 15是默认计算的 HeadLength + BodyLength + RequestID + Version + Compresser + Serializer
-	// 中间的1是为了分隔符留下的
-	headLength := 15 + len(req.ServiceName) + 1 + len(req.MethodName) + 1
-	for key, value := range req.Meta {
-		// key长度 + 分隔符占位 + value长度 + 和下一个key value 的分隔符
-		headLength += len(key) + 1 + len(value) + 1
-	}
-	req.HeadLength = uint32(headLength)
-}
-
-func (req *Request) calculateBodyLength() {
-	req.BodyLength = uint32(len(req.Data))
 }
