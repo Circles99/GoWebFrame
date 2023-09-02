@@ -76,7 +76,14 @@ func (s *Server) handleConn(conn net.Conn) error {
 		if err != nil {
 			return err
 		}
-		resp, err := s.Invoke(context.Background(), req)
+
+		ctx := context.Background()
+		oneway, ok := req.Meta["one-way"]
+		if ok && oneway == "true" {
+			ctx = CtxWithOnewayKey(ctx)
+		}
+
+		resp, err := s.Invoke(ctx, req)
 
 		if err != nil {
 			// 这个可能是业务error
@@ -115,6 +122,14 @@ func (s *Server) Invoke(ctx context.Context, req *message.Request) (*message.Res
 	if !ok {
 		return resp, errors.New("调用的服务不存在")
 	}
+
+	if isOneway(ctx) {
+		go func() {
+			_, _ = service.Invoke(ctx, req)
+		}()
+		return nil, errors.New("oneway 请求")
+	}
+
 	respData, err := service.Invoke(ctx, req)
 
 	resp.Data = respData

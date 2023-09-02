@@ -55,10 +55,16 @@ func setFuncField(service Service, p Proxy, s serializer.Serializer) error {
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
 
+				// 暂时先写死，后面我们考虑通用的链路元数据传递再重构
+				var meta map[string]string
+				if isOneway(ctx) {
+					meta = map[string]string{"one-way": "true"}
+				}
+
 				req := &message.Request{
 					ServiceName: service.Name(),
 					MethodName:  fieldTyp.Name,
-
+					Meta:        meta,
 					//slice.Map[reflect.Value, any](args, func(idx int, src reflect.Value) any {
 					//	return src.Interface()
 					//}),
@@ -129,7 +135,8 @@ func NewClient(addr string, options ...ClientOption) *Client {
 func (c Client) Invoke(ctx context.Context, req *message.Request) (*message.Response, error) {
 
 	data := message.EncodeReq(req)
-	resp, err := c.Send(data)
+
+	resp, err := c.Send(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +144,7 @@ func (c Client) Invoke(ctx context.Context, req *message.Request) (*message.Resp
 	return message.DecodeResp(resp), nil
 }
 
-func (c *Client) Send(data []byte) ([]byte, error) {
+func (c *Client) Send(ctx context.Context, data []byte) ([]byte, error) {
 	conn, err := net.DialTimeout("tcp", c.addr, time.Second)
 	if err != nil {
 		return nil, err
@@ -151,6 +158,11 @@ func (c *Client) Send(data []byte) ([]byte, error) {
 	_, err = conn.Write(data)
 	if err != nil {
 		return nil, err
+	}
+
+	if isOneway(ctx) {
+		// 返回一个 error，防止有用户真的去接收结果
+		return nil, errors.New("这是 oneway 调用")
 	}
 
 	return ReadMsg(conn)
