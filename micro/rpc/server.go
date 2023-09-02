@@ -8,6 +8,8 @@ import (
 	"golang.org/x/net/context"
 	"net"
 	"reflect"
+	"strconv"
+	"time"
 )
 
 type Server struct {
@@ -78,12 +80,23 @@ func (s *Server) handleConn(conn net.Conn) error {
 		}
 
 		ctx := context.Background()
+		cancel := func() {}
+		if deadlineStr, ok := req.Meta["deadline"]; ok {
+			if deadline, er := strconv.ParseInt(deadlineStr, 10, 64); er != nil {
+				//  time.UnixMilli 这个方法是把毫秒数穿进去，他会转成时间
+				ctx, cancel = context.WithDeadline(ctx, time.UnixMilli(deadline))
+			}
+		}
+
 		oneway, ok := req.Meta["one-way"]
 		if ok && oneway == "true" {
 			ctx = CtxWithOnewayKey(ctx)
 		}
 
 		resp, err := s.Invoke(ctx, req)
+
+		// 用掉ctx后关闭
+		cancel()
 
 		if err != nil {
 			// 这个可能是业务error
@@ -151,7 +164,7 @@ func (r *reflectionStub) Invoke(ctx context.Context, req *message.Request) ([]by
 	method := r.value.MethodByName(req.MethodName)
 
 	in := make([]reflect.Value, 2)
-	in[0] = reflect.ValueOf(context.Background())
+	in[0] = reflect.ValueOf(ctx)
 
 	// 这个arg真正的类型
 	//val.Type().In(0)

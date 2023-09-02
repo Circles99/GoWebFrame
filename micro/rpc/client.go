@@ -6,8 +6,10 @@ import (
 	"GoWebFrame/micro/rpc/serializer/json"
 	"context"
 	"errors"
+	"github.com/silenceper/pool"
 	"net"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -55,10 +57,15 @@ func setFuncField(service Service, p Proxy, s serializer.Serializer) error {
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
 
-				// 暂时先写死，后面我们考虑通用的链路元数据传递再重构
-				var meta map[string]string
+				meta := make(map[string]string, 2)
+
+				// 我确实设置的超时
+				if deadline, ok := ctx.Deadline(); ok {
+					meta["deadline"] = strconv.FormatInt(deadline.UnixMilli(), 10)
+				}
+
 				if isOneway(ctx) {
-					meta = map[string]string{"one-way": "true"}
+					meta["one-way"] = "true"
 				}
 
 				req := &message.Request{
@@ -113,15 +120,32 @@ func setFuncField(service Service, p Proxy, s serializer.Serializer) error {
 
 type Client struct {
 	serializer serializer.Serializer
-
-	addr string
+	pool       pool.Pool
 }
 
 type ClientOption func(client *Client)
 
-func NewClient(addr string, options ...ClientOption) *Client {
+func NewClient(addr string, options ...ClientOption) (*Client, error) {
+	config := &pool.Config{
+		InitialCap: 5,
+		MaxCap:     30,
+		MaxIdle:    20,
+		Factory: func() (interface{}, error) {
+			return net.Dial("tcp", addr)
+		},
+		Close: func(i interface{}) error {
+			return i.(net.Conn).Close()
+		},
+		IdleTimeout: time.Minute,
+	}
+
+	connPool, err := pool.NewChannelPool(config)
+	if err != nil {
+		return nil, err
+	}
+
 	res := &Client{
-		addr:       addr,
+		pool:       connPool,
 		serializer: &json.Serializer{},
 	}
 
@@ -129,11 +153,39 @@ func NewClient(addr string, options ...ClientOption) *Client {
 		opt(res)
 	}
 
-	return res
+	return res, nil
 }
 
 func (c Client) Invoke(ctx context.Context, req *message.Request) (*message.Response, error) {
 
+	// 超时控制代码，但无法控制到发送里面
+	// 比如已经超时了，但是send返回了
+	// 每次进来都需要创建个channel，性能损害
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	ch := make(chan struct{})
+	var (
+		resp *message.Response
+		err  error
+	)
+
+	go func() {
+		resp, err = c.doInvoke(ctx, req)
+		ch <- struct{}{}
+		close(ch)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-ch:
+		return resp, err
+	}
+}
+
+func (c *Client) doInvoke(ctx context.Context, req *message.Request) (*message.Response, error) {
 	data := message.EncodeReq(req)
 
 	resp, err := c.Send(ctx, data)
@@ -145,15 +197,16 @@ func (c Client) Invoke(ctx context.Context, req *message.Request) (*message.Resp
 }
 
 func (c *Client) Send(ctx context.Context, data []byte) ([]byte, error) {
-	conn, err := net.DialTimeout("tcp", c.addr, time.Second)
+	val, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
-		_ = conn.Close()
+		_ = c.pool.Put(val)
 	}()
 
+	conn := val.(net.Conn)
 	//req := EncodeMsg(data)
 	_, err = conn.Write(data)
 	if err != nil {
