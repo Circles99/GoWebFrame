@@ -5,11 +5,14 @@ go 1.19
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/prometheus/client_golang v1.7.1
+	github.com/silenceper/pool v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.opentelemetry.io/otel v1.14.0
 	go.opentelemetry.io/otel/trace v1.14.0
 	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.3.0
+	google.golang.org/grpc v1.50.0
+	google.golang.org/protobuf v1.30.0
 )
 
 require (
@@ -20,9 +23,9 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.10.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
-	github.com/silenceper/pool v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
+	google.golang.org/genproto v0.0.0-20221010155953-15ba04fc1c0e // indirect
 )
 
 require (
