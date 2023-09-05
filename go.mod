@@ -17,6 +17,11 @@ require (
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/coreos/etcd v3.3.27+incompatible // indirect
+	github.com/coreos/go-semver v0.3.1 // indirect
+	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
+	github.com/coreos/pkg v0.0.0-20230601102743-20bbbf26f4d8 // indirect
+	github.com/gogo/protobuf v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -24,6 +29,9 @@ require (
 	github.com/prometheus/common v0.10.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
+	go.etcd.io/etcd v3.3.27+incompatible // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20221010155953-15ba04fc1c0e // indirect
 )
