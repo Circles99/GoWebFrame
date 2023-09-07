@@ -24,4 +24,6 @@ type ServiceInstance struct {
 }
 
 type Event struct {
+	// add delete
+	Type string
 }

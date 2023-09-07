@@ -12,16 +12,17 @@ type grpcBuilder struct {
 	timeout time.Duration
 }
 
-func NewRegisterBuilder(r register.Register) (*grpcBuilder, error) {
-	return &grpcBuilder{r: r}, nil
+func NewRegisterBuilder(r register.Register, timeout time.Duration) (*grpcBuilder, error) {
+	return &grpcBuilder{r: r, timeout: timeout}, nil
 }
 
 func (b *grpcBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
 
 	r := grpcResolver{
-		target: target,
-		r:      b.r,
-		cc:     cc,
+		target:  target,
+		r:       b.r,
+		cc:      cc,
+		timeout: b.timeout,
 	}
 
 	// 需要立刻解析一次，不然client不知道怎么连接
@@ -68,7 +69,15 @@ func (r grpcResolver) watch() {
 	for {
 		select {
 		case <-events:
+			// resolve 都是幂等的
 			r.resolve()
+		//case event := <-events:
+		//	switch event.Type {
+		//	case "DELETE":
+		//		// 删除已有的节点
+		//
+		//	}
+
 		case <-r.close:
 			return
 		}
