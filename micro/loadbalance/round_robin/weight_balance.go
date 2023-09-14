@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc/balancer/base"
 	"math"
 	"math/rand"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,6 +27,7 @@ func (w *WeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	for _, c := range w.connections {
+		// 可以改成connection中放锁。让锁的粒度更小，但是可能会导致准确性更差
 		totalWeight = totalWeight + c.efficientWeight
 		c.currentWeight = c.currentWeight + c.efficientWeight
 		if res == nil || res.currentWeight < c.currentWeight {
@@ -96,18 +96,19 @@ func (w *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker
 	cs := make([]*weightConn, 0, len(info.ReadySCs))
 
 	for sub, subInfo := range info.ReadySCs {
-		weightStr := subInfo.Address.Attributes.Value("weight").(string)
-
-		weight, err := strconv.ParseInt(weightStr, 10, 64)
-		if err != nil {
-			panic(err)
-		}
+		weight := subInfo.Address.Attributes.Value("weight").(uint32)
+		//weightStr := subInfo.Address.Attributes.Value("weight").(uint32)
+		//
+		//weight, err := strconv.ParseInt(weightStr, 10, 64)
+		//if err != nil {
+		//	panic(err)
+		//}
 
 		cs = append(cs, &weightConn{
 			c:               sub,
-			weight:          uint32(weight),
-			currentWeight:   uint32(weight),
-			efficientWeight: uint32(weight),
+			weight:          weight,
+			currentWeight:   weight,
+			efficientWeight: weight,
 		})
 	}
 

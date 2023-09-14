@@ -21,6 +21,7 @@ type ServiceInstance struct {
 	// Addr 最关键的定位信息
 	Address string
 	// 下面可以任意加字段，完全取决于你的服务治理要做成什么样子
+	Weight uint32
 }
 
 type Event struct {
