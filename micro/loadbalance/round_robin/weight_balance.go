@@ -1,12 +1,15 @@
 package round_robin
 
 import (
+	"fmt"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 	"math"
+	"math/rand"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type WeightBalancer struct {
@@ -118,4 +121,75 @@ type weightConn struct {
 	weight          uint32
 	currentWeight   uint32
 	efficientWeight uint32
+}
+
+// 在这个示例中，我们首先定义了三个节点，每个节点有不同的有效权重（EffectiveWeight）。然后，我们模拟了一系列请求的选择过程，其中每个请求的结果是随机生成的，用 simulateRequest 函数来表示请求成功或失败。
+//
+// 在每次请求选择节点后，我们根据请求的结果来调整节点的权重，使用 updateNodeWeight 函数。如果请求成功，节点的有效权重会逐渐增加，反之会逐渐减少。
+//
+// 通过运行这个示例，您可以看到每次请求选择的节点，以及节点权重的变化。这个示例演示了带有动态权重调整的加权轮询负载均衡算法的工作原理。请注意，这个示例中的权重调整是基于随机模拟的请求结果，实际情况下可能会根据实际情况来调整节点的权重
+type Node struct {
+	Name            string
+	Weight          uint32
+	CurrentWeight   uint32
+	EffectiveWeight uint32
+}
+
+func XXX() {
+	nodes := []Node{
+		{Name: "NodeA", Weight: 3, CurrentWeight: 0, EffectiveWeight: 3},
+		{Name: "NodeB", Weight: 2, CurrentWeight: 0, EffectiveWeight: 2},
+		{Name: "NodeC", Weight: 1, CurrentWeight: 0, EffectiveWeight: 1},
+	}
+
+	totalWeight := uint32(6) // 总有效权重
+	rand.Seed(time.Now().UnixNano())
+
+	for i := 0; i < 10; i++ {
+		node := selectNode(nodes, totalWeight)
+		fmt.Printf("选择节点：%s\n", node.Name)
+		success := simulateRequest(node)
+		updateNodeWeight(node, success)
+		fmt.Printf("节点权重：%s(%d)\n", node.Name, node.EffectiveWeight)
+	}
+}
+
+func selectNode(nodes []Node, totalWeight uint32) Node {
+	maxWeightNode := nodes[0]
+	maxWeight := uint32(0)
+
+	for _, node := range nodes {
+		node.CurrentWeight += node.EffectiveWeight
+		if node.CurrentWeight > maxWeight {
+			maxWeight = node.CurrentWeight
+			maxWeightNode = node
+		}
+	}
+
+	maxWeightNode.CurrentWeight -= totalWeight
+	return maxWeightNode
+}
+
+func simulateRequest(node Node) bool {
+	// 模拟请求成功率，这里随机生成一个数字，模拟请求成功或失败
+	r := rand.Float64()
+	return r < 0.8 // 假设请求成功率为 80%
+}
+
+func updateNodeWeight(node Node, success bool) {
+	if success {
+		if node.EffectiveWeight == 0 {
+			return
+		}
+		if node.EffectiveWeight < math.MaxUint32 {
+			node.EffectiveWeight++
+		}
+	} else {
+		if node.EffectiveWeight == math.MaxUint32 {
+			return
+		}
+		if node.EffectiveWeight > 0 {
+			node.EffectiveWeight--
+		}
+	}
 }
