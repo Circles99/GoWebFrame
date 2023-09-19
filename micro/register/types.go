@@ -22,6 +22,8 @@ type ServiceInstance struct {
 	Address string
 	// 下面可以任意加字段，完全取决于你的服务治理要做成什么样子
 	Weight uint32
+
+	Group string
 }
 
 type Event struct {

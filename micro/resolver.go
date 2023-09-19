@@ -13,7 +13,9 @@ type grpcBuilder struct {
 	timeout time.Duration
 }
 
-func NewRegisterBuilder(r register.Register, timeout time.Duration) (*grpcBuilder, error) {
+type grpcBuilderOptions func(builder grpcBuilder)
+
+func NewRegisterBuilder(r register.Register, timeout time.Duration, opts ...grpcBuilderOptions) (*grpcBuilder, error) {
 	return &grpcBuilder{r: r, timeout: timeout}, nil
 }
 
@@ -99,7 +101,10 @@ func (r grpcResolver) resolve() {
 	address := make([]resolver.Address, 0, len(instance))
 
 	for _, si := range instance {
-		address = append(address, resolver.Address{Addr: si.Address, Attributes: attributes.New("weight", si.Weight)})
+		address = append(address, resolver.Address{
+			Addr:       si.Address,
+			Attributes: attributes.New("weight", si.Weight).WithValue("group", si.Group),
+		})
 	}
 
 	err = r.cc.UpdateState(resolver.State{

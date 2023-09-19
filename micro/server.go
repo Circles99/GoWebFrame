@@ -18,6 +18,7 @@ type Server struct {
 	*grpc.Server
 	listener net.Listener
 	weight   uint32
+	group    string
 }
 
 func NewServer(name string, opts ...ServerOptions) (*Server, error) {
@@ -59,6 +60,7 @@ func (s Server) Start(addr string) error {
 			// 在容器中不能够使用
 			// 容器外的地址：在start的时候传进来，或者在环境变量中获取
 			Address: listener.Addr().String(),
+			Group:   s.group,
 		})
 		if err != nil {
 			return err
@@ -95,5 +97,11 @@ func (s Server) Close() error {
 func ServerWithRegister(r register.Register) ServerOptions {
 	return func(server *Server) {
 		server.register = r
+	}
+}
+
+func ServerWithGroup(group string) ServerOptions {
+	return func(server *Server) {
+		server.group = group
 	}
 }
