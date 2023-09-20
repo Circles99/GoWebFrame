@@ -34,7 +34,7 @@ func (b *Balancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	idx := atomic.AddInt32(&b.index, 1)
 
 	// 取余， length 和 connections 初始化之后没人修改， 不需要用原子操作
-	c := b.connections[idx%b.length]
+	c := candidates[int(idx)%len(candidates)]
 
 	return balancer.PickResult{
 		SubConn: c.c, //对一个实例的连接池的抽象
@@ -45,7 +45,7 @@ func (b *Balancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 }
 
 type Builder struct {
-	filter route.Filter
+	Filter route.Filter
 }
 
 func (b *Builder) Build(info base.PickerBuildInfo) balancer.Picker {
@@ -62,8 +62,8 @@ func (b *Builder) Build(info base.PickerBuildInfo) balancer.Picker {
 		return true
 	}
 
-	if b.filter != nil {
-		filter = b.filter
+	if b.Filter != nil {
+		filter = b.Filter
 	}
 
 	return &Balancer{

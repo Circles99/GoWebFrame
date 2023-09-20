@@ -1,10 +1,14 @@
 package micro
 
 import (
+	"GoWebFrame/micro/register"
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/balancer/base"
 	"google.golang.org/grpc/resolver"
+	"time"
 )
 
 type ClientOption func(c *Client)
@@ -12,6 +16,8 @@ type ClientOption func(c *Client)
 type Client struct {
 	insecure bool
 	rb       resolver.Builder
+
+	balancer balancer.Builder
 }
 
 func NewClient(opts ...ClientOption) (*Client, error) {
@@ -27,6 +33,20 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 func ClientRb(rb resolver.Builder) ClientOption {
 	return func(c *Client) {
 		c.rb = rb
+	}
+}
+
+func ClientWithRegistry(r register.Register, timeout time.Duration) ClientOption {
+	return func(client *Client) {
+		client.rb = NewRegisterBuilder(r, timeout)
+	}
+}
+
+func ClientWithPickerBuilder(name string, b base.PickerBuilder) ClientOption {
+	return func(client *Client) {
+		builder := base.NewBalancerBuilder(name, b, base.Config{HealthCheck: true})
+		balancer.Register(builder)
+		client.balancer = builder
 	}
 }
 

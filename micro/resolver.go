@@ -13,10 +13,8 @@ type grpcBuilder struct {
 	timeout time.Duration
 }
 
-type grpcBuilderOptions func(builder grpcBuilder)
-
-func NewRegisterBuilder(r register.Register, timeout time.Duration, opts ...grpcBuilderOptions) (*grpcBuilder, error) {
-	return &grpcBuilder{r: r, timeout: timeout}, nil
+func NewRegisterBuilder(r register.Register, timeout time.Duration) *grpcBuilder {
+	return &grpcBuilder{r: r, timeout: timeout}
 }
 
 func (b *grpcBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {

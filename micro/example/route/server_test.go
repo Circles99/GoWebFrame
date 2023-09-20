@@ -21,8 +21,6 @@ func TestServer(t *testing.T) {
 
 	require.NoError(t, err)
 
-	us := &UserServiceServer{}
-
 	var eg errgroup.Group
 	for i := 0; i < 3; i++ {
 		var group = "A"
@@ -32,7 +30,7 @@ func TestServer(t *testing.T) {
 
 		server, err := micro.NewServer("user-service", micro.ServerWithRegister(r), micro.ServerWithGroup(group))
 		require.NoError(t, err)
-
+		us := &UserServiceServer{}
 		gen.RegisterUserServiceServer(server, us)
 
 		eg.Go(func() error {
@@ -45,11 +43,13 @@ func TestServer(t *testing.T) {
 }
 
 type UserServiceServer struct {
+	group string
 	gen.UnimplementedUserServiceServer
 }
 
 func (s UserServiceServer) GetById(ctx context.Context, req *gen.GetByIdReq) (*gen.GetByIdResp, error) {
 	fmt.Println(req)
+	fmt.Println(s.group)
 	return &gen.GetByIdResp{User: &gen.User{
 		Name: "hello word",
 	}}, nil
