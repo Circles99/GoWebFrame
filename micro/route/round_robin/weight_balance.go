@@ -1,9 +1,11 @@
 package round_robin
 
 import (
+	"GoWebFrame/micro/route"
 	"fmt"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
+	"google.golang.org/grpc/resolver"
 	"math"
 	"math/rand"
 	"sync"
@@ -14,25 +16,30 @@ import (
 type WeightBalancer struct {
 	connections []*weightConn
 	mutex       sync.Mutex
+	filter      route.Filter
 }
 
 func (w *WeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
-
-	if len(w.connections) == 0 {
-		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
-	}
 
 	var totalWeight uint32
 	var res *weightConn
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	for _, c := range w.connections {
+		if w.filter != nil && !w.filter(info, c.addr) {
+			continue
+		}
 		// 可以改成connection中放锁。让锁的粒度更小，但是可能会导致准确性更差
 		totalWeight = totalWeight + c.efficientWeight
 		c.currentWeight = c.currentWeight + c.efficientWeight
 		if res == nil || res.currentWeight < c.currentWeight {
 			res = c
 		}
+	}
+
+	// 一个都没有
+	if res == nil {
+		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
 	res.currentWeight = res.currentWeight - totalWeight
@@ -89,6 +96,7 @@ func (w *WeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 }
 
 type WeightBalancerBuilder struct {
+	Filter route.Filter
 }
 
 func (w *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
@@ -109,6 +117,7 @@ func (w *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker
 			weight:          weight,
 			currentWeight:   weight,
 			efficientWeight: weight,
+			addr:            subInfo.Address,
 		})
 	}
 
@@ -122,6 +131,7 @@ type weightConn struct {
 	weight          uint32
 	currentWeight   uint32
 	efficientWeight uint32
+	addr            resolver.Address
 }
 
 // 在这个示例中，我们首先定义了三个节点，每个节点有不同的有效权重（EffectiveWeight）。然后，我们模拟了一系列请求的选择过程，其中每个请求的结果是随机生成的，用 simulateRequest 函数来表示请求成功或失败。
