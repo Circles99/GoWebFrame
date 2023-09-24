@@ -50,12 +50,16 @@ func ClientWithPickerBuilder(name string, b base.PickerBuilder) ClientOption {
 	}
 }
 
-func (c Client) Dail(ctx context.Context, service string) (*grpc.ClientConn, error) {
+func (c Client) Dail(ctx context.Context, service string, dailOptions ...grpc.DialOption) (*grpc.ClientConn, error) {
 
 	opts := []grpc.DialOption{grpc.WithResolvers(c.rb)}
 
 	if c.insecure {
 		opts = append(opts, grpc.WithInsecure())
+	}
+
+	if len(dailOptions) > 0 {
+		opts = append(opts, dailOptions...)
 	}
 
 	cc, err := grpc.DialContext(ctx, fmt.Sprintf("register:///%s", service), opts...)
