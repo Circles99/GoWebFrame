@@ -3,7 +3,7 @@ package cache
 import (
 	"context"
 	// "github.com/go-redis/redis/v7"
-	redis "github.com/go-redis/redis/v9"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"

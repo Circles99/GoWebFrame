@@ -2,12 +2,9 @@ package cache
 
 import (
 	"context"
-	"errors"
 	"log"
 	"time"
 )
-
-var KeyNotFound = errors.New("key not found")
 
 // ReadThroughCache 是一个装饰器
 // 在原本 Cache 的功能上添加了 read through 功能

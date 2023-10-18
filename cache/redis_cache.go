@@ -3,7 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
-	redis "github.com/go-redis/redis/v9"
+	"github.com/redis/go-redis/v9"
 	"time"
 )
 
@@ -53,4 +53,3 @@ func (r *RedisCache) Delete(ctx context.Context, key string) error {
 func (r *RedisCache) LoadAndDelete(ctx context.Context, key string) (any, error) {
 	return r.client.GetDel(ctx, key).Result()
 }
-
