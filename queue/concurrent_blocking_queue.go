@@ -2,22 +2,22 @@ package queue
 
 import (
 	"context"
-	"errors"
 	"sync"
 )
 
 type ConcurrentBlockingQueue[T any] struct {
-	mutex   *sync.Mutex
-	data    []T
-	notFull *sync.Cond
+	mutex    *sync.Mutex
+	data     []T
+	notFull  chan struct{}
+	notEmpty chan struct{}
 }
 
 func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] {
 	m := &sync.Mutex{}
 	return &ConcurrentBlockingQueue[T]{
-		data:    make([]T, 0, maxSize),
-		mutex:   m,
-		notFull: sync.NewCond(m),
+		data:  make([]T, 0, maxSize),
+		mutex: m,
+		//notFull:
 	}
 }
 
@@ -30,23 +30,41 @@ func (c *ConcurrentBlockingQueue[T]) Enqueue(ctx context.Context, data any) erro
 		c.mutex.Unlock()
 		return ctx.Err()
 	default:
-		if c.IsFull() {
-			// 我阻塞住我自己，知道有人唤醒我
-			c.notFull.Wait()
-		}
+
 	}
 
+	// 这里不用if 需要用for
+	// 如果有多个G，比如G1和G2， 同时唤醒，G2直接入队，G1需要再次阻塞自己 所以使用for
+	for c.IsFull() {
+		// 我阻塞住我自己，知道有人唤醒我
+		c.mutex.Unlock()
+		select {
+		case <-c.notFull:
+			c.mutex.Lock()
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+	}
 	c.data = append(c.data, data)
+	c.notEmpty <- struct{}{}
 	c.mutex.Unlock()
 	return nil
 }
 
 func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	if c.IsEmpty() {
-		var t T
-		return t, errors.New("空的队列")
+	for c.IsEmpty() {
+		// 阻塞我自己，等待元素入队
+		c.mutex.Unlock()
+
+		select {
+		case <-c.notEmpty:
+
+		}
+
+		//var t T
+		//return t, errors.New("空的队列")
 	}
 
 	// 队首
