@@ -104,6 +104,7 @@ func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 
 	c.mutex.Unlock()
 
+	// 没人等notFull 就会一直卡主
 	return t, nil
 
 }
@@ -114,11 +115,43 @@ func (c *ConcurrentBlockingQueue[T]) Len() uint64 {
 }
 
 func (c *ConcurrentBlockingQueue[T]) IsFull() bool {
-	//TODO implement me
-	panic("implement me")
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return len(c.data) == c.maxSize
 }
 
 func (c *ConcurrentBlockingQueue[T]) IsEmpty() bool {
-	//TODO implement me
-	panic("implement me")
+	return len(c.data) == 0
+}
+
+type cond struct {
+	sync.Cond
+}
+
+func (c *cond) WaitTimeout(ctx context.Context) error {
+	ch := make(chan struct{})
+
+	go func() {
+		// 等待被唤醒
+		c.Cond.Wait()
+		// 唤醒之后尝试往ch发信号
+		select {
+		case ch <- struct{}{}:
+		default:
+			// 发不进去ch 开始走入default 代表超时返回了
+			// 转发这个信号
+			c.Cond.Signal()
+			// 需要解除锁，因为wait会lock，转发之后需要释放掉
+			c.Cond.L.Unlock()
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-ch:
+		// 真的被唤醒了
+		return nil
+	}
+
 }
