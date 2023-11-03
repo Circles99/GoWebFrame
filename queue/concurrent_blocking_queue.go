@@ -3,6 +3,8 @@ package queue
 import (
 	"context"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 )
 
 type ConcurrentBlockingQueue[T any] struct {
@@ -159,34 +161,79 @@ func (c *ConcurrentBlockingQueue[T]) isEmpty() bool {
 	return len(c.data) == 0
 }
 
-type cond struct {
-	*sync.Cond
+//type cond struct {
+//	*sync.Cond
+//}
+//
+//func (c *cond) WaitTimeout(ctx context.Context) error {
+//	ch := make(chan struct{})
+//
+//	go func() {
+//		// 等待被唤醒
+//		c.Cond.Wait()
+//		// 唤醒之后尝试往ch发信号
+//		select {
+//		case ch <- struct{}{}:
+//		default:
+//			// 发不进去ch 开始走入default 代表超时返回了
+//			// 转发这个信号
+//			c.Cond.Signal()
+//			// 需要解除锁，因为wait会lock，转发之后需要释放掉
+//			c.Cond.L.Unlock()
+//		}
+//	}()
+//
+//	select {
+//	case <-ctx.Done():
+//		return ctx.Err()
+//	case <-ch:
+//		// 真的被唤醒了
+//		return nil
+//	}
+//
+//}
+
+type Cond struct {
+	L sync.Locker
+	n unsafe.Pointer
 }
 
-func (c *cond) WaitTimeout(ctx context.Context) error {
-	ch := make(chan struct{})
-
-	go func() {
-		// 等待被唤醒
-		c.Cond.Wait()
-		// 唤醒之后尝试往ch发信号
-		select {
-		case ch <- struct{}{}:
-		default:
-			// 发不进去ch 开始走入default 代表超时返回了
-			// 转发这个信号
-			c.Cond.Signal()
-			// 需要解除锁，因为wait会lock，转发之后需要释放掉
-			c.Cond.L.Unlock()
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-ch:
-		// 真的被唤醒了
-		return nil
+func NewCond(l sync.Locker) *Cond {
+	c := &Cond{
+		L: l,
 	}
+	n := make(chan struct{})
+	c.n = unsafe.Pointer(&n)
+	return c
+}
 
+func (c Cond) Wait() {
+	n := c.NotifyChan()
+	c.L.Unlock()
+	<-n
+	c.L.Lock()
+}
+
+func (c Cond) WaitWithTimeout(ctx context.Context) error {
+	n := c.NotifyChan()
+	c.L.Unlock()
+	select {
+	case <-n:
+		c.L.Lock()
+		return nil
+	case <-ctx.Done():
+		c.L.Lock()
+		return ctx.Err()
+	}
+}
+
+func (c Cond) NotifyChan() <-chan struct{} {
+	ptr := atomic.LoadPointer(&c.n)
+	return *((*chan struct{})(ptr))
+}
+
+func (c Cond) Broadcast() {
+	n := make(chan struct{})
+	ptrOld := atomic.SwapPointer(&c.n, unsafe.Pointer(&n))
+	close(*((*chan struct{})(ptrOld)))
 }
