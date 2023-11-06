@@ -14,24 +14,20 @@ type ConcurrentBlockingQueue[T any] struct {
 	notEmpty chan struct{}
 	maxSize  int
 
-	notFullCond  *cond
-	notEmptyCond *cond
+	notFullCond  *Cond
+	notEmptyCond *Cond
 }
 
 func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] {
 	m := &sync.Mutex{}
 	return &ConcurrentBlockingQueue[T]{
-		data:     make([]T, 0, maxSize),
-		mutex:    m,
-		notFull:  make(chan struct{}),
-		notEmpty: make(chan struct{}),
-		maxSize:  maxSize,
-		notFullCond: &cond{
-			Cond: sync.NewCond(m),
-		},
-		notEmptyCond: &cond{
-			Cond: sync.NewCond(m),
-		},
+		data:         make([]T, 0, maxSize),
+		mutex:        m,
+		notFull:      make(chan struct{}),
+		notEmpty:     make(chan struct{}),
+		maxSize:      maxSize,
+		notFullCond:  NewCond(nil),
+		notEmptyCond: NewCond(nil),
 	}
 }
 
@@ -63,7 +59,7 @@ func (c *ConcurrentBlockingQueue[T]) Enqueue(ctx context.Context, data any) erro
 		//case <-ctx.Done():
 		//	return ctx.Err()
 		//}
-		err := c.notFullCond.WaitTimeout(ctx)
+		err := c.notFullCond.WaitWithTimeout(ctx)
 		if err != nil {
 			return err
 		}
@@ -78,7 +74,7 @@ func (c *ConcurrentBlockingQueue[T]) Enqueue(ctx context.Context, data any) erro
 	//}
 
 	// cond实现
-	c.notEmptyCond.Signal()
+	c.notEmptyCond.Broadcast()
 
 	c.mutex.Unlock()
 	return nil
@@ -106,7 +102,7 @@ func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 		//	var t T
 		//	return t, ctx.Err()
 		//}
-		err := c.notEmptyCond.WaitTimeout(ctx)
+		err := c.notEmptyCond.WaitWithTimeout(ctx)
 		if err != nil {
 			var t T
 			return t, err
@@ -127,7 +123,7 @@ func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 	//	//}
 	//}
 
-	c.notFullCond.Signal()
+	c.notFullCond.Broadcast()
 	c.mutex.Unlock()
 
 	// 没人等notFull 就会一直卡主
