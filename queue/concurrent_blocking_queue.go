@@ -143,8 +143,8 @@ func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 	// 当前下标数据已经返回出去了，需要填充个0值覆盖掉他
 	// 不然外面有用户明明不使用这个A了，但是里面还有个引用指向A，不会被GC回收
 	c.data[c.head] = c.zero
-
 	c.head++
+	c.count--
 	if c.head == c.maxSize {
 		c.head = 0
 	}
@@ -158,8 +158,9 @@ func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 }
 
 func (c *ConcurrentBlockingQueue[T]) Len() uint64 {
-	//TODO implement me
-	panic("implement me")
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return uint64(c.count)
 }
 
 func (c *ConcurrentBlockingQueue[T]) IsFull() bool {
