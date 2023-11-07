@@ -64,6 +64,7 @@ func (c *ConcurrentBlockingQueue[T]) Enqueue(ctx context.Context, data any) erro
 			return err
 		}
 	}
+	// 可能引起扩容
 	c.data = append(c.data, data)
 	// 没有人等 notEmpty的新号，这一句会阻塞住
 	//if len(c.data) == 1 {
