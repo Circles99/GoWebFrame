@@ -16,18 +16,23 @@ type ConcurrentBlockingQueue[T any] struct {
 
 	notFullCond  *Cond
 	notEmptyCond *Cond
+
+	count int
+	head  int
+	tail  int
+	zero  T
 }
 
 func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] {
 	m := &sync.Mutex{}
 	return &ConcurrentBlockingQueue[T]{
-		data:         make([]T, 0, maxSize),
+		data:         make([]T, maxSize),
 		mutex:        m,
 		notFull:      make(chan struct{}),
 		notEmpty:     make(chan struct{}),
 		maxSize:      maxSize,
-		notFullCond:  NewCond(nil),
-		notEmptyCond: NewCond(nil),
+		notFullCond:  NewCond(m),
+		notEmptyCond: NewCond(m),
 	}
 }
 
@@ -64,8 +69,16 @@ func (c *ConcurrentBlockingQueue[T]) Enqueue(ctx context.Context, data any) erro
 			return err
 		}
 	}
+
+	c.data[c.tail] = data
+	c.tail++
+	c.count++
+	if c.tail == c.maxSize {
+		c.tail = 0
+	}
+
 	// 可能引起扩容
-	c.data = append(c.data, data)
+	//c.data = append(c.data, data)
 	// 没有人等 notEmpty的新号，这一句会阻塞住
 	//if len(c.data) == 1 {
 	//	// 只有从空变不空发信号 chan实现
@@ -111,8 +124,8 @@ func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 	}
 
 	// 队首
-	t := c.data[0]
-	c.data = c.data[1:]
+	//t := c.data[0]
+	//c.data = c.data[1:]
 	// 直接使用 c.notFull <- struct{}{}
 	// 如果上面根本没有人在select接收，会永远阻塞在这
 	// chan实现
@@ -123,6 +136,18 @@ func (c *ConcurrentBlockingQueue[T]) Dequeue(ctx context.Context) (any, error) {
 	//	//default:
 	//	//}
 	//}
+
+	// ring buffer原理实现
+	t := c.data[c.head]
+
+	// 当前下标数据已经返回出去了，需要填充个0值覆盖掉他
+	// 不然外面有用户明明不使用这个A了，但是里面还有个引用指向A，不会被GC回收
+	c.data[c.head] = c.zero
+
+	c.head++
+	if c.head == c.maxSize {
+		c.head = 0
+	}
 
 	c.notFullCond.Broadcast()
 	c.mutex.Unlock()
@@ -145,7 +170,7 @@ func (c *ConcurrentBlockingQueue[T]) IsFull() bool {
 
 func (c *ConcurrentBlockingQueue[T]) isFull() bool {
 
-	return len(c.data) == c.maxSize
+	return c.count == c.maxSize
 }
 
 func (c *ConcurrentBlockingQueue[T]) IsEmpty() bool {
@@ -155,7 +180,7 @@ func (c *ConcurrentBlockingQueue[T]) IsEmpty() bool {
 }
 
 func (c *ConcurrentBlockingQueue[T]) isEmpty() bool {
-	return len(c.data) == 0
+	return c.count == 0
 }
 
 //type cond struct {
