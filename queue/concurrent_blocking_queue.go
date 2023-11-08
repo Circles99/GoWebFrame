@@ -26,6 +26,8 @@ type ConcurrentBlockingQueue[T any] struct {
 func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] {
 	m := &sync.Mutex{}
 	return &ConcurrentBlockingQueue[T]{
+		// 即便是ring buffer， 一次性分配完内存，也是有缺陷的
+		// 如果不行一开始把所有的内存分配好，可以使用链表
 		data:         make([]T, maxSize),
 		mutex:        m,
 		notFull:      make(chan struct{}),
