@@ -41,6 +41,13 @@ func (c *ConcurrentBlockingQueue[T]) Enqueue(ctx context.Context, data any) erro
 	}
 
 	c.mutex.Lock()
+
+	// 抢锁的时候可能超时
+	if ctx.Err() != nil {
+		c.mutex.Unlock()
+		return ctx.Err()
+	}
+
 	//// 全是bug
 	//// 这里需要自己释放锁，如果不是放，另外一边是拿不到
 	//select {
